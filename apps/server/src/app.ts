@@ -244,11 +244,9 @@ export function buildApp(config: AppConfig) {
     let sourceReleases = releaseFixtures;
     if (jackett && series) {
       const titles = [...new Set([series.title, series.originalTitle].filter((value): value is string => Boolean(value)))];
-      const queries = titles.flatMap((title) => [
-        { title, season: parsed.data.season ?? 1, episode: parsed.data.episode },
-        { title, season: parsed.data.season ?? 1 },
-        { title, television: true },
-      ]);
+      const queries = titles.flatMap((title) => parsed.data.episode ? [
+        { title, season: parsed.data.season ?? 1, episode: parsed.data.episode }, { title, season: parsed.data.season ?? 1 }, { title, television: true },
+      ] : [{ title, season: parsed.data.season ?? 1 }, { title, television: true }]);
       const batches = await Promise.all(queries.map((query) => jackett.search(query).catch(() => [])));
       sourceReleases = [...new Map(batches.flat().map((release) => [`${release.indexer}:${release.title}:${release.linkToken}`, release])).values()];
     } else if (jackett) sourceReleases = await jackett.search({ title: movie!.title, year: movie!.year });

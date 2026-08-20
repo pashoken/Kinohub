@@ -12,6 +12,14 @@ const statusCopy: Record<Movie["mediaStatus"], string> = {
   failed: "Ошибка загрузки",
 };
 const watchlistStorageKey = "kinohub-watchlist-v1";
+const watchedEpisodesStorageKey = "kinohub-watched-episodes-v1";
+
+function watchedEpisodeKey(seriesId: string, season: number, episode: number) { return `${seriesId}:S${season}:E${episode}`; }
+function readWatchedEpisodes(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(watchedEpisodesStorageKey) ?? "[]") as string[]); }
+  catch { return new Set(); }
+}
+function saveWatchedEpisodes(value: Set<string>) { localStorage.setItem(watchedEpisodesStorageKey, JSON.stringify([...value])); }
 
 function readWatchlist(): Movie[] {
   try {
@@ -497,13 +505,13 @@ export function externalPlayerUrl(
 
 export function PlaybackPanel({
   choiceId,
-  preferredEpisode,
+  seriesContext,
   initialResult,
   initialError,
   onClose,
 }: {
   choiceId?: string;
-  preferredEpisode?: { season: number; episode: number };
+  seriesContext?: { seriesId: string; season: number };
   initialResult?: PlaybackResult;
   initialError?: string;
   onClose: () => void;
@@ -515,6 +523,7 @@ export function PlaybackPanel({
   const [selected, setSelected] = useState<PlaybackFile | undefined>(
     initialResult?.status === "ready" ? initialResult.files[0] : undefined,
   );
+  const [watched, setWatched] = useState(readWatchedEpisodes);
   const autoStartedRef = useRef(false);
   const dialogRef = useRef<HTMLElement>(null);
   useDialogFocus(true, dialogRef);
@@ -535,10 +544,6 @@ export function PlaybackPanel({
         throw new Error(payload.message ?? "Не удалось запустить просмотр");
       setResult(payload);
       if (payload.status === "ready") setSelected(payload.files[0]);
-      else if (preferredEpisode) {
-        const matches = payload.files.filter((file) => episodeFileMatches(file.path, preferredEpisode.season, preferredEpisode.episode));
-        if (matches.length === 1) setSelected(matches[0]);
-      }
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -546,7 +551,7 @@ export function PlaybackPanel({
           : "Не удалось запустить просмотр",
       );
     }
-  }, [choiceId, preferredEpisode]);
+  }, [choiceId]);
   useEffect(() => {
     if (!initialResult && !initialError && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -554,6 +559,21 @@ export function PlaybackPanel({
     }
   }, [initialError, initialResult, launch]);
   const active = selected;
+  const episodeFiles = useMemo(() => {
+    if (!result || result.status !== "choose_file" || !seriesContext) return result?.files ?? [];
+    const matchingSeason = result.files.filter((file) => episodeFileInfo(file.path)?.season === seriesContext.season);
+    return matchingSeason.length ? matchingSeason : result.files;
+  }, [result, seriesContext]);
+  const markActiveWatched = () => {
+    if (!active || !seriesContext) return;
+    const info = episodeFileInfo(active.path);
+    if (!info) return;
+    setWatched((current) => { const next = new Set(current).add(watchedEpisodeKey(seriesContext.seriesId, info.season, info.episode)); saveWatchedEpisodes(next); return next; });
+  };
+  useEffect(() => {
+    if (active || !seriesContext || !episodeFiles.length) return;
+    queueMicrotask(() => focusAndReveal(dialogRef.current?.querySelector<HTMLElement>('[data-episode-watched="false"]') ?? dialogRef.current?.querySelector<HTMLElement>(".file-list .focusable") ?? null));
+  }, [active, episodeFiles, seriesContext]);
   useEffect(() => {
     if (!active) return;
     queueMicrotask(() =>
@@ -603,16 +623,21 @@ export function PlaybackPanel({
       {result?.status === "choose_file" && !active ? (
         <div className="file-list">
           <p>В торренте несколько видео. Выберите файл:</p>
-          {result.files.map((file) => (
+          {episodeFiles.map((file) => {
+            const info = episodeFileInfo(file.path);
+            const isWatched = Boolean(info && seriesContext && watched.has(watchedEpisodeKey(seriesContext.seriesId, info.season, info.episode)));
+            return (
             <button
               className="choice focusable"
               key={file.id}
+              data-episode-watched={String(isWatched)}
               onClick={() => setSelected(file)}
             >
-              {file.path}
+              <span>{info ? `${info.episode} серия` : file.path}{isWatched ? " · ✓ Просмотрено" : ""}</span>
+              {info ? <small>{file.path}</small> : null}
               <span>{(file.length / 1024 ** 3).toFixed(1)} ГБ</span>
             </button>
-          ))}
+          );})}
         </div>
       ) : null}
       {active ? (
@@ -623,9 +648,11 @@ export function PlaybackPanel({
             className="primary link-button focusable"
             href={externalPlayerUrl(active.streamUrl, "video/*")}
             data-player-autofocus
+            onClick={markActiveWatched}
           >
             Выбрать плеер
           </a>
+          {seriesContext ? <button className="secondary focusable" onClick={() => setSelected(undefined)}>← К списку серий</button> : null}
           <a
             className="secondary link-button focusable"
             href={active.streamUrl}
@@ -660,6 +687,12 @@ export function episodeFileMatches(path: string, season: number, episode: number
   const s = String(season).padStart(2, "0");
   const e = String(episode).padStart(2, "0");
   return new RegExp(`(?:s${s}[ ._-]*e${e}|${season}x${e}|season[ ._-]*${season}[ ._-]*episode[ ._-]*${episode})`, "i").test(path);
+}
+
+export function episodeFileInfo(path: string): { season: number; episode: number } | null {
+  const match = path.match(/s(\d{1,2})[ ._-]*e(\d{1,3})|(?:^|\D)(\d{1,2})x(\d{1,3})(?:\D|$)|season[ ._-]*(\d{1,2})[ ._-]*episode[ ._-]*(\d{1,3})/i);
+  if (!match) return null;
+  return { season: Number(match[1] ?? match[3] ?? match[5]), episode: Number(match[2] ?? match[4] ?? match[6]) };
 }
 
 export function MovieDetails({
@@ -750,11 +783,8 @@ export function MovieDetails({
 function SeriesDetails({ series }: { series: Series }) {
   const seasons = series.seasons.filter((item) => item.seasonNumber > 0 && item.episodeCount > 0);
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
-  const episodeCount = seasons.find((item) => item.seasonNumber === season)?.episodeCount ?? 1;
-  const [episode, setEpisode] = useState(1);
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
-  const selectSeason = (value: number) => { setSeason(value); setEpisode(1); };
   return (
     <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
       <a className="back focusable" href="/series">← К сериалам</a>
@@ -764,13 +794,12 @@ function SeriesDetails({ series }: { series: Series }) {
         <div className="detail-facts"><span className="meta">{series.year}{series.episodeRuntimeMinutes ? ` · ~${series.episodeRuntimeMinutes} мин` : ""}</span><Ratings movie={series} /><span className="genres">{series.genres.join(" · ")}</span></div>
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
         <div className="episode-picker" aria-label="Выбор серии">
-          <label>Сезон<select className="focusable" value={season} onChange={(event) => selectSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
-          <label>Серия<select className="focusable" value={episode} onChange={(event) => setEpisode(Number(event.target.value))}>{Array.from({ length: episodeCount }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label>
-          <button className="primary focusable movie-action" data-page-autofocus onClick={() => setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Смотреть S{String(season).padStart(2, "0")}E{String(episode).padStart(2, "0")}</button>
+          <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
+          <button className="primary focusable movie-action" data-page-autofocus onClick={() => setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Выбрать раздачу {season} сезона</button>
         </div>
       </div>
-      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} episode={episode} onClose={() => setShowChoices(false)} onSelect={(id) => { setShowChoices(false); setChoiceId(id); }} /> : null}
-      {choiceId ? <PlaybackPanel choiceId={choiceId} preferredEpisode={{ season, episode }} onClose={() => setChoiceId(undefined)} /> : null}
+      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id) => { setShowChoices(false); setChoiceId(id); }} /> : null}
+      {choiceId ? <PlaybackPanel choiceId={choiceId} seriesContext={{ seriesId: series.id, season }} onClose={() => setChoiceId(undefined)} /> : null}
     </article>
   );
 }

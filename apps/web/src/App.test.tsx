@@ -14,6 +14,7 @@ import {
   androidPlayerIntent,
   externalPlayerUrl,
   episodeFileMatches,
+  episodeFileInfo,
   Home,
   MovieDetails,
   MoviePoster,
@@ -28,6 +29,7 @@ describe("series episode matching", () => {
     expect(episodeFileMatches(path, 1, 3)).toBe(true);
   });
   it("does not select a different episode", () => expect(episodeFileMatches("Reacher.S01E04.mkv", 1, 3)).toBe(false));
+  it("extracts season and episode from a torrent filename", () => expect(episodeFileInfo("Game.of.Thrones.S02E07.mkv")).toEqual({ season: 2, episode: 7 }));
 });
 
 afterEach(() => {
@@ -400,6 +402,13 @@ describe("playback panel", () => {
       screen.getByRole("link", { name: "Открыть поток в новой вкладке" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Открыть M3U в VLC / Kodi" })).toHaveAttribute("href", expect.stringContaining("/playlist"));
+  });
+  it("marks a launched series episode as watched", () => {
+    const episodeFile = { ...files[0]!, path: "Reacher.S01E02.mkv" };
+    render(<PlaybackPanel initialResult={{ status: "choose_file", files: [episodeFile, { ...files[1]!, path: "Reacher.S01E03.mkv" }] }} seriesContext={{ seriesId: "108978", season: 1 }} onClose={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: /2 серия/ }));
+    fireEvent.click(screen.getByRole("link", { name: "Выбрать плеер" }));
+    expect(localStorage.getItem("kinohub-watched-episodes-v1")).toContain("108978:S1:E2");
   });
   it("renders single-file ready and timeout retry/diagnostics states", () => {
     const ready = render(
