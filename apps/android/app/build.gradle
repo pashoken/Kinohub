@@ -10,9 +10,9 @@ android {
         applicationId "ru.kinohub.tv"
         minSdk 23
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
-        buildConfigField "String", "KinoHub_URL", '"http://192.168.0.120:4100/"'
+        versionCode 2
+        versionName "0.2.0"
+        buildConfigField "String", "KINOHUB_URL", '"http://192.168.0.120:4100/"'
     }
 
     buildFeatures {

@@ -767,6 +767,7 @@ type DiagnosticService = {
 };
 
 export function SetupDiagnostics() {
+  const androidTvApp = /KinoHubTV\//i.test(navigator.userAgent);
   const [payload, setPayload] = useState<{
     mode: string;
     services: DiagnosticService[];
@@ -792,6 +793,11 @@ export function SetupDiagnostics() {
       <p className="eyebrow">ДИАГНОСТИКА</p>
       <h1 id="setup-title">Подключения KinoHub</h1>
       <p>Адреса показаны без ключей и учётных данных.</p>
+      {androidTvApp ? (
+        <a className="primary link-button focusable" href="kinohub-settings://open">
+          Изменить адрес сервера в приложении
+        </a>
+      ) : null}
       {!payload && !failed ? (
         <p role="status">Проверяем локальные сервисы…</p>
       ) : null}
