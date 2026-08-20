@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+artifacts/screenshots/*.png
+artifacts/reports/*.json
+playwright-report/
+test-results/

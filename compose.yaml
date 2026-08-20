@@ -1,0 +1,137 @@
+name: kinohub-local
+services:
+  kinohub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kinohub-tv:local
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4100
+      PUBLIC_APP_ORIGIN: http://${LAN_HOST:-192.168.0.120}:${KINOHUB_PORT:-4100}
+      SEERR_URL: http://seerr:5055
+      PUBLIC_JACKETT_URL: http://jackett:9117
+      TORRSERVER_URL: http://torrserver:8090
+      PUBLIC_TORRSERVER_URL: http://${LAN_HOST:-192.168.0.120}:${CONTAINER_TORRSERVER_PORT:-8091}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "image.tmdb.org:185.59.220.199"
+    ports:
+      - "${LAN_BIND:-0.0.0.0}:${KINOHUB_PORT:-4100}:4100"
+    networks: [kinohub]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      jackett:
+        condition: service_healthy
+      torrserver:
+        condition: service_healthy
+      seerr:
+        condition: service_healthy
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    init: true
+    environment:
+      LOG_LEVEL: info
+      TZ: Europe/Samara
+      PORT: 5055
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "api.themoviedb.org:65.9.62.11"
+      - "image.tmdb.org:185.59.220.199"
+    ports:
+      - "127.0.0.1:${SEERR_PORT:-5055}:5055"
+    volumes:
+      - seerr-data:/app/config
+    networks: [kinohub]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5055/api/v1/settings/public || exit 1"]
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 6
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Samara
+      AUTO_UPDATE: "true"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    extra_hosts:
+      - "rutor.info:193.46.255.29"
+      - "rutracker.org:104.21.32.39"
+    ports:
+      - "127.0.0.1:${JACKETT_PORT:-9117}:9117"
+    volumes:
+      - jackett-config:/config
+      - jackett-downloads:/downloads
+    networks: [kinohub]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9117/UI/Dashboard >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    environment:
+      LOG_LEVEL: info
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: none
+      TZ: Europe/Samara
+    networks: [kinohub]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8191/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  torrserver:
+    image: ghcr.io/yourok/torrserver:latest
+    environment:
+      TS_PORT: "8090"
+      TS_PATH: /opt/ts
+      TS_DONTKILL: "1"
+      TS_HTTPAUTH: "0"
+    ports:
+      - "${LAN_BIND:-0.0.0.0}:${CONTAINER_TORRSERVER_PORT:-8091}:8090"
+    volumes:
+      - torrserver-data:/opt/ts
+    networks: [kinohub]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8090/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+networks:
+  kinohub:
+    name: kinohub-local
+volumes:
+  jackett-config:
+  jackett-downloads:
+  torrserver-data:
+  seerr-data:
+    external: true
+    name: kinohub-seerr_seerr-data
