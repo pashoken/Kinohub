@@ -20,6 +20,7 @@ import {
 import { releaseFixtures } from "../../../fixtures/releases.js";
 import {
   rankRelease,
+  rankSeriesRelease,
   ReleaseCache,
   toPublicChoice,
 } from "./release-ranking.js";
@@ -251,7 +252,7 @@ export function buildApp(config: AppConfig) {
       sourceReleases = [...new Map(batches.flat().map((release) => [`${release.indexer}:${release.title}:${release.linkToken}`, release])).values()];
     } else if (jackett) sourceReleases = await jackett.search({ title: movie!.title, year: movie!.year });
     const choices = sourceReleases
-      .map(rankRelease)
+      .map((release) => series ? rankSeriesRelease(release, parsed.data.season ?? 1) : rankRelease(release))
       .sort(
         (a, b) =>
           b.score - a.score || a.raw.title.localeCompare(b.raw.title, "ru"),

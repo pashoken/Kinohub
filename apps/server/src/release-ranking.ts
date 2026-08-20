@@ -36,6 +36,25 @@ export function rankRelease(raw: TorznabRelease): RankedRelease {
   return { raw, parsed, score, compatibility: parsed.resolution === '1080p' && parsed.codec === 'h264' ? 'compatible' : 'warning', rationale };
 }
 
+export function releaseSeasonCoverage(title: string): number[] {
+  const normalized = title.normalize('NFKC');
+  const range = normalized.match(/(?:\bS|сезон(?:ы|а)?[ .:_-]*)(\d{1,2})[ ._-]*(?:-|–|—|to)[ ._-]*(?:S)?(\d{1,2})/i);
+  if (range) {
+    const start = Number(range[1]); const end = Number(range[2]);
+    if (start > 0 && end >= start && end - start < 30) return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }
+  const seasons = [...normalized.matchAll(/(?:\bS|сезон[ .:_-]*)(\d{1,2})(?!\d)/gi)].map((match) => Number(match[1])).filter((value) => value > 0);
+  return [...new Set(seasons)];
+}
+
+export function rankSeriesRelease(raw: TorznabRelease, requestedSeason: number): RankedRelease {
+  const ranked = rankRelease(raw); const coverage = releaseSeasonCoverage(raw.title);
+  if (!coverage.length) return { ...ranked, rationale: [...ranked.rationale, 'Сезоны в названии не определены'] };
+  if (!coverage.includes(requestedSeason)) return { ...ranked, score: ranked.score - 300, rationale: [...ranked.rationale, `−300: раздача не содержит сезон ${requestedSeason}`] };
+  const bonus = coverage.length > 1 ? 30 : 12;
+  return { ...ranked, score: ranked.score + bonus, rationale: [...ranked.rationale, `+${bonus}: содержит сезон ${requestedSeason}${coverage.length > 1 ? ' и подходит для следующих сезонов' : ''}`] };
+}
+
 type CacheEntry = { raw: TorznabRelease; expiresAt: number };
 export class ReleaseCache {
   private readonly entries = new Map<string, CacheEntry>();

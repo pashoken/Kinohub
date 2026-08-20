@@ -13,6 +13,7 @@ const statusCopy: Record<Movie["mediaStatus"], string> = {
 };
 const watchlistStorageKey = "kinohub-watchlist-v1";
 const watchedEpisodesStorageKey = "kinohub-watched-episodes-v1";
+const seriesPacksStorageKey = "kinohub-series-packs-v1";
 
 function watchedEpisodeKey(seriesId: string, season: number, episode: number) { return `${seriesId}:S${season}:E${episode}`; }
 function readWatchedEpisodes(): Set<string> {
@@ -20,6 +21,18 @@ function readWatchedEpisodes(): Set<string> {
   catch { return new Set(); }
 }
 function saveWatchedEpisodes(value: Set<string>) { localStorage.setItem(watchedEpisodesStorageKey, JSON.stringify([...value])); }
+
+type SavedSeriesPack = { releaseName: string; files: PlaybackFile[] };
+function readSeriesPacks(): Record<string, SavedSeriesPack> {
+  try { return JSON.parse(localStorage.getItem(seriesPacksStorageKey) ?? "{}") as Record<string, SavedSeriesPack>; }
+  catch { return {}; }
+}
+function saveSeriesPack(seriesId: string, pack: SavedSeriesPack) {
+  const packs = readSeriesPacks(); packs[seriesId] = pack; localStorage.setItem(seriesPacksStorageKey, JSON.stringify(packs));
+}
+function removeSeriesPack(seriesId: string) {
+  const packs = readSeriesPacks(); delete packs[seriesId]; localStorage.setItem(seriesPacksStorageKey, JSON.stringify(packs));
+}
 
 function readWatchlist(): Movie[] {
   try {
@@ -375,7 +388,7 @@ export function TorrentChoiceDrawer({
   episode?: number;
   initialChoices?: TorrentChoice[];
   onClose: () => void;
-  onSelect?: (id: string) => void;
+  onSelect?: (id: string, choice: TorrentChoice) => void;
 }) {
   const [choices, setChoices] = useState<TorrentChoice[] | undefined>(
     initialChoices,
@@ -440,7 +453,7 @@ export function TorrentChoiceDrawer({
             className={`choice choice-${choice.compatibility} focusable`}
             key={choice.id}
             disabled={choice.compatibility === "incompatible"}
-            onClick={() => onSelect?.(choice.id)}
+            onClick={() => onSelect?.(choice.id, choice)}
           >
             <span className="choice-main">
               <strong>{choice.releaseName}</strong>
@@ -506,12 +519,14 @@ export function externalPlayerUrl(
 export function PlaybackPanel({
   choiceId,
   seriesContext,
+  onResolved,
   initialResult,
   initialError,
   onClose,
 }: {
   choiceId?: string;
   seriesContext?: { seriesId: string; season: number };
+  onResolved?: (result: PlaybackResult) => void;
   initialResult?: PlaybackResult;
   initialError?: string;
   onClose: () => void;
@@ -543,6 +558,7 @@ export function PlaybackPanel({
       if (!response.ok)
         throw new Error(payload.message ?? "Не удалось запустить просмотр");
       setResult(payload);
+      onResolved?.(payload);
       if (payload.status === "ready") setSelected(payload.files[0]);
     } catch (reason) {
       setError(
@@ -551,7 +567,7 @@ export function PlaybackPanel({
           : "Не удалось запустить просмотр",
       );
     }
-  }, [choiceId]);
+  }, [choiceId, onResolved]);
   useEffect(() => {
     if (!initialResult && !initialError && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -785,6 +801,9 @@ function SeriesDetails({ series }: { series: Series }) {
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
+  const [releaseName, setReleaseName] = useState("");
+  const [savedPack, setSavedPack] = useState<SavedSeriesPack | undefined>(() => readSeriesPacks()[series.id]);
+  const [useSavedPack, setUseSavedPack] = useState(false);
   return (
     <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
       <a className="back focusable" href="/series">← К сериалам</a>
@@ -795,11 +814,14 @@ function SeriesDetails({ series }: { series: Series }) {
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
         <div className="episode-picker" aria-label="Выбор серии">
           <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
-          <button className="primary focusable movie-action" data-page-autofocus onClick={() => setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Выбрать раздачу {season} сезона</button>
+          <button className="primary focusable movie-action" data-page-autofocus onClick={() => savedPack ? setUseSavedPack(true) : setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
+          {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
+        {savedPack ? <p className="saved-pack">Закреплена раздача: {savedPack.releaseName}</p> : null}
       </div>
-      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id) => { setShowChoices(false); setChoiceId(id); }} /> : null}
-      {choiceId ? <PlaybackPanel choiceId={choiceId} seriesContext={{ seriesId: series.id, season }} onClose={() => setChoiceId(undefined)} /> : null}
+      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id, choice) => { setShowChoices(false); setReleaseName(choice.releaseName); setChoiceId(id); }} /> : null}
+      {choiceId ? <PlaybackPanel choiceId={choiceId} seriesContext={{ seriesId: series.id, season }} onResolved={(result) => { const pack = { releaseName, files: result.files }; saveSeriesPack(series.id, pack); setSavedPack(pack); }} onClose={() => setChoiceId(undefined)} /> : null}
+      {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} seriesContext={{ seriesId: series.id, season }} onClose={() => setUseSavedPack(false)} /> : null}
     </article>
   );
 }

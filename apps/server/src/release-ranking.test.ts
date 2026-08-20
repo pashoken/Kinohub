@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { releaseFixtures } from '../../../fixtures/releases.js';
 import { parseTorznab } from './integrations/jackett.js';
-import { parseReleaseTitle, rankRelease, ReleaseCache, toPublicChoice } from './release-ranking.js';
+import { parseReleaseTitle, rankRelease, rankSeriesRelease, releaseSeasonCoverage, ReleaseCache, toPublicChoice } from './release-ranking.js';
 
 describe('release parser and deterministic scorer', () => {
+  it('understands season packs and prefers one containing the requested season', () => {
+    expect(releaseSeasonCoverage('Game of Thrones [S01-08] 1080p x264')).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    const pack = rankSeriesRelease({ ...releaseFixtures[0]!, title: 'Show S01-08 1080p x264' }, 3);
+    const wrong = rankSeriesRelease({ ...releaseFixtures[0]!, title: 'Show S01-02 1080p x264' }, 3);
+    expect(pack.score).toBeGreaterThan(wrong.score);
+    expect(pack.rationale.join(' ')).toContain('следующих сезонов');
+  });
   it('parses Cyrillic, alternate editions, language and source', () => { expect(parseReleaseTitle('Фильм.2025.1080p.WEB-DL.x264.RUS.ENG.Directors.Cut')).toMatchObject({ resolution: '1080p', codec: 'h264', source: 'WEB-DL', languages: ['RU', 'EN'] }); });
   it('recognizes original English audio and RU/EN subtitles independently', () => { const parsed = parseReleaseTitle('Movie 1080p x264 Dub + AVO + Sub Eng Rus + Original Eng'); expect(parsed).toMatchObject({ englishAudio: true, subtitles: ['RU', 'EN'] }); const choice = toPublicChoice(rankRelease({ ...releaseFixtures[0]!, title: 'Movie 1080p x264 Sub Eng Rus Original Eng' }), 'id'); expect(choice.flags).toEqual(expect.arrayContaining(['ENG AUDIO', 'RU SUB', 'EN SUB'])); expect(choice.rationale.join(' ')).toContain('английскую дорожку'); });
 

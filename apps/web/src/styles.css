@@ -443,6 +443,7 @@ button {
 .episode-picker { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-top: 26px; }
 .episode-picker label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; font-weight: 700; }
 .episode-picker select { min-width: 110px; min-height: 52px; padding: 0 14px; border: 1px solid #536486; border-radius: 12px; background: #111827; color: #fff; font: inherit; }
+.saved-pack { margin-top: 14px; color: var(--muted); font-size: .9rem; }
 .search-field input {
   width: min(760px, 100%);
   min-height: 64px;
