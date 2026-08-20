@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { parseConfig } from "../config.js";
 import {
   seerrMovieFixture,
+  seerrSeriesFixture,
   torznabFixture,
 } from "../../../../fixtures/integrations.js";
 import { IntegrationError } from "./errors.js";
 import { integrationDiagnostics, safeJellyfinLink } from "./health.js";
 import { requestJson, requestText } from "./http.js";
 import { JackettClient, parseTorznab } from "./jackett.js";
-import { normalizeSeerrMovie, SeerrClient } from "./seerr.js";
+import { normalizeSeerrMovie, normalizeSeerrSeries, SeerrClient } from "./seerr.js";
 import { TorrServerClient } from "./torrserver.js";
 import { KinopoiskClient } from "./kinopoisk.js";
 
@@ -36,6 +37,10 @@ describe("Seerr adapter fixtures", () => {
       title: "Бойцовский клуб",
       mediaStatus: "available",
     });
+  });
+
+  it("normalizes TV seasons for episode selection", () => {
+    expect(normalizeSeerrSeries(seerrSeriesFixture)).toMatchObject({ id: "1399", title: "Игра престолов", numberOfSeasons: 8, seasons: [{ seasonNumber: 1, episodeCount: 10 }] });
   });
 
   it("keeps X-Api-Key on the backend for discover, search, detail, request, and status", async () => {
@@ -97,6 +102,14 @@ describe("Jackett Torznab", () => {
       indexer: "Домашний индексатор",
       size: 4294967296,
     });
+  });
+
+  it("constructs an episode TV search", () => {
+    const url = new JackettClient(new URL("http://jackett.test"), "private-key").buildSearchUrl({ title: "Игра престолов", season: 2, episode: 3 });
+    expect(url.searchParams.get("t")).toBe("search");
+    expect(url.searchParams.get("season")).toBe("2");
+    expect(url.searchParams.get("ep")).toBe("3");
+    expect(url.searchParams.get("q")).toContain("S02E03");
   });
 
   it("maps malformed XML to UPSTREAM_INVALID_XML", () => {

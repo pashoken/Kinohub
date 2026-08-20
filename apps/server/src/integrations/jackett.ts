@@ -15,7 +15,7 @@ export type TorznabRelease = {
   attributes: Record<string, string>;
 };
 
-const searchSchema = z.object({ title: z.string().min(1), year: z.number().int().optional(), imdbId: z.string().optional() });
+const searchSchema = z.object({ title: z.string().min(1), year: z.number().int().optional(), imdbId: z.string().optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional(), television: z.boolean().optional() });
 
 export class JackettClient {
   constructor(private readonly baseUrl: URL, private readonly apiKey: string, private readonly policy: HttpPolicy = {}, private readonly publicBaseUrl = baseUrl) {}
@@ -24,9 +24,12 @@ export class JackettClient {
     const query = searchSchema.parse(input);
     const url = new URL('/api/v2.0/indexers/all/results/torznab/api', this.baseUrl);
     url.searchParams.set('apikey', this.apiKey);
-    url.searchParams.set('t', 'movie');
-    url.searchParams.set('cat', '2000');
-    url.searchParams.set('q', [query.title, query.year].filter(Boolean).join(' '));
+    const television = query.television === true || query.season !== undefined;
+    url.searchParams.set('t', television ? 'search' : 'movie');
+    if (!television) url.searchParams.set('cat', '2000');
+    url.searchParams.set('q', [query.title, television ? `S${String(query.season).padStart(2, '0')}${query.episode ? `E${String(query.episode).padStart(2, '0')}` : ''}` : query.year].filter(Boolean).join(' '));
+    if (query.season) url.searchParams.set('season', String(query.season));
+    if (query.episode) url.searchParams.set('ep', String(query.episode));
     if (query.imdbId) url.searchParams.set('imdbid', query.imdbId);
     return url;
   }

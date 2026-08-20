@@ -12,6 +12,13 @@ export const seerrMovieFixture = {
   mediaInfo: { status: 4 }
 };
 
+export const seerrSeriesFixture = {
+  id: 1399, name: 'Игра престолов', originalName: 'Game of Thrones', firstAirDate: '2011-04-17',
+  overview: 'Борьба великих домов.', voteAverage: 8.5, episodeRunTime: [57], numberOfSeasons: 8,
+  genres: [{ name: 'Драма' }], posterPath: '/show.jpg', backdropPath: '/show-bg.jpg', mediaInfo: { status: 4 },
+  seasons: [{ seasonNumber: 1, name: 'Сезон 1', episodeCount: 10, airDate: '2011-04-17', posterPath: '/season.jpg' }]
+};
+
 export const torznabFixture = `<?xml version="1.0" encoding="UTF-8"?>
 <rss xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel><item>
   <title>Фильм.2025.1080p.WEB-DL.x264</title>

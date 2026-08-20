@@ -4,7 +4,7 @@ import Fastify from "fastify";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { catalogSchema, healthSchema, type Movie } from "@kinohub/contracts";
+import { catalogSchema, healthSchema, type Movie, type Series } from "@kinohub/contracts";
 import { fixtureCatalog } from "../../../fixtures/catalog.js";
 import type { AppConfig } from "./config.js";
 import { integrationDiagnostics } from "./integrations/health.js";
@@ -62,6 +62,12 @@ export function buildApp(config: AppConfig) {
     posterUrl: proxyImageUrl(movie.posterUrl, config.PUBLIC_APP_ORIGIN),
     backdropUrl: proxyImageUrl(movie.backdropUrl, config.PUBLIC_APP_ORIGIN),
   });
+  const proxySeriesImages = (series: Series): Series => ({
+    ...series,
+    posterUrl: proxyImageUrl(series.posterUrl, config.PUBLIC_APP_ORIGIN),
+    backdropUrl: proxyImageUrl(series.backdropUrl, config.PUBLIC_APP_ORIGIN),
+    seasons: series.seasons.map((season) => ({ ...season, posterUrl: proxyImageUrl(season.posterUrl, config.PUBLIC_APP_ORIGIN) })),
+  });
 
   app.get("/api/health", async () =>
     healthSchema.parse({ status: "ok", mode: config.APP_MODE }),
@@ -108,6 +114,19 @@ export function buildApp(config: AppConfig) {
       generatedAt: new Date().toISOString(),
     });
   });
+  app.get("/api/series", async (request, reply) => {
+    if (!seerr) return { series: [] };
+    const parsed = z.object({ page: z.coerce.number().int().min(1).max(100).default(1) }).safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ code: "INVALID_PAGE", message: "Некорректная страница" });
+    const series = (await seerr.discoverSeries(parsed.data.page)).map(proxySeriesImages);
+    return { series, page: parsed.data.page, hasMore: series.length >= 15 };
+  });
+  app.get("/api/series/:id", async (request, reply) => {
+    if (!seerr) return reply.code(404).send({ code: "SERIES_NOT_FOUND", message: "Сериал не найден" });
+    const id = (request.params as { id: string }).id;
+    try { return proxySeriesImages(await seerr.seriesDetail(id)); }
+    catch { return reply.code(404).send({ code: "SERIES_NOT_FOUND", message: "Сериал не найден" }); }
+  });
   app.get("/api/rails/:id", async (request, reply) => {
     if (!seerr) return reply.code(404).send({ code: "LIVE_ONLY", message: "Расширенные ленты доступны в live-режиме" });
     const id = (request.params as { id: string }).id;
@@ -128,7 +147,11 @@ export function buildApp(config: AppConfig) {
     const query = parsed.success
       ? (parsed.data.q ?? "").trim().toLocaleLowerCase("ru")
       : "";
-    if (seerr && query) return { query, movies: (await seerr.search(query)).map(proxyMovieImages) };
+    if (seerr && query) return {
+      query,
+      movies: (await seerr.search(query)).map(proxyMovieImages),
+      series: (await seerr.searchSeries(query)).map(proxySeriesImages),
+    };
     const movies = fixtureCatalog.rails.flatMap((rail) => rail.movies);
     return {
       query,
@@ -138,7 +161,7 @@ export function buildApp(config: AppConfig) {
               .toLocaleLowerCase("ru")
               .includes(query),
           )
-        : [],
+        : [], series: [],
     };
   });
   app.get("/api/ratings/kinopoisk", async (request, reply) => {
@@ -198,7 +221,8 @@ export function buildApp(config: AppConfig) {
   });
   app.post("/api/torrents/search", async (request, reply) => {
     const parsed = z
-      .object({ movieId: z.string().min(1).max(80) })
+      .object({ movieId: z.string().min(1).max(80).optional(), seriesId: z.string().min(1).max(80).optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() })
+      .refine((value) => Boolean(value.movieId) !== Boolean(value.seriesId))
       .strict()
       .safeParse(request.body);
     if (!parsed.success)
@@ -206,16 +230,28 @@ export function buildApp(config: AppConfig) {
         code: "INVALID_SEARCH",
         message: "Некорректный фильм для поиска",
       });
-    const movie = seerr
+    const movie = parsed.data.movieId ? (seerr
       ? proxyMovieImages(await seerr.detail(parsed.data.movieId))
-      : fixtureCatalog.rails.flatMap((rail) => rail.movies).find((item) => item.id === parsed.data.movieId);
-    if (!movie)
+      : fixtureCatalog.rails.flatMap((rail) => rail.movies).find((item) => item.id === parsed.data.movieId)) : undefined;
+    const series = parsed.data.seriesId && seerr ? proxySeriesImages(await seerr.seriesDetail(parsed.data.seriesId)) : undefined;
+    const media = movie ?? series;
+    if (!media)
       return reply
         .code(404)
         .send({ code: "MOVIE_NOT_FOUND", message: "Фильм не найден" });
     if (config.APP_MODE === "live" && !jackett)
       return reply.code(503).send({ code: "JACKETT_NOT_CONFIGURED", message: "Для поиска торрентов нужно подключить Jackett" });
-    const sourceReleases = jackett ? await jackett.search({ title: movie.title, year: movie.year }) : releaseFixtures;
+    let sourceReleases = releaseFixtures;
+    if (jackett && series) {
+      const titles = [...new Set([series.title, series.originalTitle].filter((value): value is string => Boolean(value)))];
+      const queries = titles.flatMap((title) => [
+        { title, season: parsed.data.season ?? 1, episode: parsed.data.episode },
+        { title, season: parsed.data.season ?? 1 },
+        { title, television: true },
+      ]);
+      const batches = await Promise.all(queries.map((query) => jackett.search(query).catch(() => [])));
+      sourceReleases = [...new Map(batches.flat().map((release) => [`${release.indexer}:${release.title}:${release.linkToken}`, release])).values()];
+    } else if (jackett) sourceReleases = await jackett.search({ title: movie!.title, year: movie!.year });
     const choices = sourceReleases
       .map(rankRelease)
       .sort(
@@ -224,7 +260,7 @@ export function buildApp(config: AppConfig) {
       )
       .map((ranked) => toPublicChoice(ranked, releases.put(ranked.raw)));
     return {
-      query: { title: movie.title, year: movie.year, movieId: movie.id },
+      query: { title: media.title, year: media.year, ...(movie ? { movieId: movie.id } : { seriesId: series!.id, season: parsed.data.season, episode: parsed.data.episode }) },
       choices,
     };
   });

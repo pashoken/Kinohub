@@ -438,6 +438,11 @@ button {
 .search-panel {
   padding-top: 70px;
 }
+.search-panel > h2 { margin-top: 40px; }
+.series-page h1 { margin-bottom: 34px; }
+.episode-picker { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-top: 26px; }
+.episode-picker label { display: grid; gap: 7px; color: var(--muted); font-size: .9rem; font-weight: 700; }
+.episode-picker select { min-width: 110px; min-height: 52px; padding: 0 14px; border: 1px solid #536486; border-radius: 12px; background: #111827; color: #fff; font: inherit; }
 .search-field input {
   width: min(760px, 100%);
   min-height: 64px;

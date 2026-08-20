@@ -13,6 +13,7 @@ import {
   App,
   androidPlayerIntent,
   externalPlayerUrl,
+  episodeFileMatches,
   Home,
   MovieDetails,
   MoviePoster,
@@ -21,6 +22,13 @@ import {
   Search,
   TorrentChoiceDrawer,
 } from "./App.js";
+
+describe("series episode matching", () => {
+  it.each(["Reacher.S01E03.mkv", "Reacher 1x03 1080p.mp4", "Season 1 Episode 3.mkv"])("recognizes %s", (path) => {
+    expect(episodeFileMatches(path, 1, 3)).toBe(true);
+  });
+  it("does not select a different episode", () => expect(episodeFileMatches("Reacher.S01E04.mkv", 1, 3)).toBe(false));
+});
 
 afterEach(() => {
   cleanup();

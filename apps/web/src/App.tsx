@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Catalog, Movie } from "@kinohub/contracts";
+import type { Catalog, Movie, Series } from "@kinohub/contracts";
 import "./styles.css";
 import { focusAndReveal, useDialogFocus, usePageFocus, useSpatialNavigation } from "./navigation.js";
 
@@ -64,7 +64,7 @@ export function MovieCard({ movie, pageAutoFocus = false }: { movie: Movie; page
   );
 }
 
-function Ratings({ movie }: { movie: Movie }) {
+function Ratings({ movie }: { movie: Pick<Movie, "title" | "year" | "rating"> }) {
   const hostRef = useRef<HTMLSpanElement>(null);
   const [kinopoisk, setKinopoisk] = useState<number | null>();
   useEffect(() => {
@@ -103,6 +103,15 @@ function Ratings({ movie }: { movie: Movie }) {
   );
 }
 
+function SeriesCard({ series, pageAutoFocus = false }: { series: Series; pageAutoFocus?: boolean }) {
+  return (
+    <a className="card focusable" href={`/series/${series.id}`} data-focusable="true" {...(pageAutoFocus ? { "data-page-autofocus": true } : {})}>
+      {series.posterUrl ? <img className="poster" src={series.posterUrl} alt={`Постер: ${series.title}`} loading="lazy" /> : <div className="poster poster-fallback" role="img" aria-label={`Нет постера: ${series.title}`}>{series.title[0]}</div>}
+      <strong>{series.title}</strong><span>{series.year} · сериал</span><Ratings movie={series} />
+    </a>
+  );
+}
+
 function ShowMoreCard({ railId, title }: { railId: string; title: string }) {
   return (
     <a className="show-more-card focusable" href={`/rails/${railId}`} data-focusable="true">
@@ -125,6 +134,7 @@ export function CatalogSkeleton() {
 export function Search({ initialResults }: { initialResults?: Movie[] }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Movie[]>(initialResults ?? []);
+  const [seriesResults, setSeriesResults] = useState<Series[]>([]);
   const [searched, setSearched] = useState(initialResults !== undefined);
   const [pending, setPending] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
@@ -137,6 +147,7 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
       sequenceRef.current += 1;
       requestRef.current?.abort();
       setResults([]);
+      setSeriesResults([]);
       setSearched(false);
       setPending(false);
       return;
@@ -152,11 +163,12 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
       })
         .then((response) => {
           if (!response.ok) throw new Error("search");
-          return response.json() as Promise<{ movies: Movie[] }>;
+          return response.json() as Promise<{ movies: Movie[]; series?: Series[] }>;
         })
         .then((payload) => {
           if (sequence !== sequenceRef.current) return;
           setResults(payload.movies);
+          setSeriesResults(payload.series ?? []);
           setSearched(true);
           setPending(false);
         })
@@ -166,6 +178,7 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
             !(error instanceof DOMException && error.name === "AbortError")
           ) {
             setResults([]);
+            setSeriesResults([]);
             setSearched(true);
             setPending(false);
           }
@@ -177,7 +190,7 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
   return (
     <section className="search-panel" aria-labelledby="search-title">
       <p className="eyebrow">ПОИСК</p>
-      <h1 id="search-title">Найдите фильм</h1>
+      <h1 id="search-title">Найдите фильм или сериал</h1>
       <label className="search-field">
         <span className="sr-only">Название фильма</span>
         <input
@@ -189,19 +202,20 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
         />
       </label>
       {pending ? <p role="status">Ищем…</p> : null}
-      {searched && !pending && results.length === 0 ? (
+      {searched && !pending && results.length === 0 && seriesResults.length === 0 ? (
         <div className="empty">
           <h2>Ничего не найдено</h2>
           <p>Проверьте название или попробуйте другой запрос.</p>
         </div>
       ) : null}
       {results.length > 0 ? (
-        <div className="result-grid">
+        <><h2>Фильмы</h2><div className="result-grid">
           {results.map((movie) => (
             <MovieCard movie={movie} key={movie.id} />
           ))}
-        </div>
+        </div></>
       ) : null}
+      {seriesResults.length > 0 ? <><h2>Сериалы</h2><div className="result-grid">{seriesResults.map((series) => <SeriesCard series={series} key={series.id} />)}</div></> : null}
     </section>
   );
 }
@@ -340,11 +354,17 @@ type TorrentChoice = {
 };
 export function TorrentChoiceDrawer({
   movieId,
+  seriesId,
+  season,
+  episode,
   initialChoices,
   onClose,
   onSelect,
 }: {
-  movieId: string;
+  movieId?: string;
+  seriesId?: string;
+  season?: number;
+  episode?: number;
   initialChoices?: TorrentChoice[];
   onClose: () => void;
   onSelect?: (id: string) => void;
@@ -361,7 +381,7 @@ export function TorrentChoiceDrawer({
     fetch("/api/torrents/search", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ movieId }),
+      body: JSON.stringify(movieId ? { movieId } : { seriesId, season, episode }),
       signal: controller.signal,
     })
       .then((response) => {
@@ -374,7 +394,7 @@ export function TorrentChoiceDrawer({
           setError(true);
       });
     return () => controller.abort();
-  }, [movieId, initialChoices]);
+  }, [movieId, seriesId, season, episode, initialChoices]);
   return (
     <aside
       ref={dialogRef}
@@ -477,11 +497,13 @@ export function externalPlayerUrl(
 
 export function PlaybackPanel({
   choiceId,
+  preferredEpisode,
   initialResult,
   initialError,
   onClose,
 }: {
   choiceId?: string;
+  preferredEpisode?: { season: number; episode: number };
   initialResult?: PlaybackResult;
   initialError?: string;
   onClose: () => void;
@@ -513,6 +535,10 @@ export function PlaybackPanel({
         throw new Error(payload.message ?? "Не удалось запустить просмотр");
       setResult(payload);
       if (payload.status === "ready") setSelected(payload.files[0]);
+      else if (preferredEpisode) {
+        const matches = payload.files.filter((file) => episodeFileMatches(file.path, preferredEpisode.season, preferredEpisode.episode));
+        if (matches.length === 1) setSelected(matches[0]);
+      }
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -520,7 +546,7 @@ export function PlaybackPanel({
           : "Не удалось запустить просмотр",
       );
     }
-  }, [choiceId]);
+  }, [choiceId, preferredEpisode]);
   useEffect(() => {
     if (!initialResult && !initialError && !autoStartedRef.current) {
       autoStartedRef.current = true;
@@ -630,6 +656,12 @@ export function PlaybackPanel({
   );
 }
 
+export function episodeFileMatches(path: string, season: number, episode: number): boolean {
+  const s = String(season).padStart(2, "0");
+  const e = String(episode).padStart(2, "0");
+  return new RegExp(`(?:s${s}[ ._-]*e${e}|${season}x${e}|season[ ._-]*${season}[ ._-]*episode[ ._-]*${episode})`, "i").test(path);
+}
+
 export function MovieDetails({
   movie,
   watchlisted = false,
@@ -713,6 +745,41 @@ export function MovieDetails({
       <Recommendations movieId={movie.id} />
     </article>
   );
+}
+
+function SeriesDetails({ series }: { series: Series }) {
+  const seasons = series.seasons.filter((item) => item.seasonNumber > 0 && item.episodeCount > 0);
+  const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
+  const episodeCount = seasons.find((item) => item.seasonNumber === season)?.episodeCount ?? 1;
+  const [episode, setEpisode] = useState(1);
+  const [showChoices, setShowChoices] = useState(false);
+  const [choiceId, setChoiceId] = useState<string>();
+  const selectSeason = (value: number) => { setSeason(value); setEpisode(1); };
+  return (
+    <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
+      <a className="back focusable" href="/series">← К сериалам</a>
+      <div className="detail-content">
+        <p className="eyebrow detail-status">СЕРИАЛ · {series.numberOfSeasons} сез.</p>
+        <h1>{series.title}</h1>
+        <div className="detail-facts"><span className="meta">{series.year}{series.episodeRuntimeMinutes ? ` · ~${series.episodeRuntimeMinutes} мин` : ""}</span><Ratings movie={series} /><span className="genres">{series.genres.join(" · ")}</span></div>
+        <p className="overview">{series.overview || "Описание пока недоступно."}</p>
+        <div className="episode-picker" aria-label="Выбор серии">
+          <label>Сезон<select className="focusable" value={season} onChange={(event) => selectSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
+          <label>Серия<select className="focusable" value={episode} onChange={(event) => setEpisode(Number(event.target.value))}>{Array.from({ length: episodeCount }, (_, index) => <option value={index + 1} key={index + 1}>{index + 1}</option>)}</select></label>
+          <button className="primary focusable movie-action" data-page-autofocus onClick={() => setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Смотреть S{String(season).padStart(2, "0")}E{String(episode).padStart(2, "0")}</button>
+        </div>
+      </div>
+      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} episode={episode} onClose={() => setShowChoices(false)} onSelect={(id) => { setShowChoices(false); setChoiceId(id); }} /> : null}
+      {choiceId ? <PlaybackPanel choiceId={choiceId} preferredEpisode={{ season, episode }} onClose={() => setChoiceId(undefined)} /> : null}
+    </article>
+  );
+}
+
+function SeriesCatalog() {
+  const [series, setSeries] = useState<Series[]>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { const controller = new AbortController(); fetch("/api/series", { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error("series"); return response.json() as Promise<{ series: Series[] }>; }).then((payload) => setSeries(payload.series)).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setFailed(true); }); return () => controller.abort(); }, []);
+  return <section className="rail-page series-page"><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid">{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div></section>;
 }
 
 export function WatchlistPage({ movies }: { movies: Movie[] }) {
@@ -914,6 +981,7 @@ export function App({
   );
   const path = initialPath ?? window.location.pathname;
   const [routeMovie, setRouteMovie] = useState<Movie>();
+  const [routeSeries, setRouteSeries] = useState<Series>();
   const [watchlist, setWatchlist] = useState<Movie[]>(readWatchlist);
   const toggleWatchlist = useCallback((selected: Movie) => {
     setWatchlist((current) => {
@@ -961,9 +1029,18 @@ export function App({
       .catch(() => undefined);
     return () => controller.abort();
   }, [movie, path]);
+  useEffect(() => {
+    const id = path.match(/^\/series\/([^/]+)/)?.[1];
+    if (!id) return;
+    const controller = new AbortController();
+    fetch(`/api/series/${encodeURIComponent(id)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<Series> : Promise.reject(new Error("series")))
+      .then(setRouteSeries).catch(() => undefined);
+    return () => controller.abort();
+  }, [path]);
   const railId = path.match(/^\/rails\/([^/]+)$/)?.[1];
   const activeRail = railId ? catalog?.rails.find((rail) => rail.id === railId) : undefined;
-  usePageFocus(`${path}:${state}:${activeMovie?.id ?? ""}:${activeRail?.id ?? ""}`, state === "ready");
+  usePageFocus(`${path}:${state}:${activeMovie?.id ?? ""}:${routeSeries?.id ?? ""}:${activeRail?.id ?? ""}`, state === "ready");
   return (
     <main>
       <header>
@@ -976,6 +1053,9 @@ export function App({
           </a>
           <a className="focusable" href="/watchlist">
             Буду смотреть
+          </a>
+          <a className="focusable" href="/series">
+            Сериалы
           </a>
           <a className="focusable" href="/search">
             Поиск
@@ -1004,6 +1084,9 @@ export function App({
       {state === "ready" && path === "/search" ? <Search /> : null}
       {state === "ready" && path === "/setup" ? <SetupDiagnostics /> : null}
       {state === "ready" && path === "/watchlist" ? <WatchlistPage movies={watchlist} /> : null}
+      {state === "ready" && path === "/series" ? <SeriesCatalog /> : null}
+      {state === "ready" && path.startsWith("/series/") && routeSeries ? <SeriesDetails series={routeSeries} /> : null}
+      {state === "ready" && path.startsWith("/series/") && !routeSeries ? <section className="empty"><h1>Загружаем сериал…</h1></section> : null}
       {state === "ready" && path.startsWith("/movies/") && activeMovie ? (
         <MovieDetails
           movie={activeMovie}
