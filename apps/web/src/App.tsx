@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Catalog, Movie, Series } from "@kinohub/contracts";
 import "./styles.css";
 import { focusAndReveal, useDialogFocus, usePageFocus, useSpatialNavigation } from "./navigation.js";
@@ -892,9 +892,9 @@ export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Seri
         <p>Выберите фильм, сохраните копию или начните просмотр.</p>
       </section>
       {catalog.rails.map((rail, railIndex) => (
+        <Fragment key={rail.id}>
         <section
           className="catalog-section"
-          key={rail.id}
           aria-labelledby={`rail-${rail.id}`}
         >
           <h2 id={`rail-${rail.id}`}>{rail.title}</h2>
@@ -906,10 +906,15 @@ export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Seri
             <ShowMoreCard railId={rail.id} title={rail.title} />
           </div>
         </section>
+        {rail.id === "popular" && series.length ? <SeriesRail series={series} /> : null}
+        </Fragment>
       ))}
-      {series.length ? <section className="catalog-section" aria-labelledby="rail-popular-series"><h2 id="rail-popular-series">Популярные сериалы</h2><div className="rail">{series.map((item) => <SeriesCard series={item} key={item.id} />)}<a className="show-more-card focusable" href="/series"><span aria-hidden="true">→</span><strong>Показать ещё</strong><small>Все сериалы</small></a></div></section> : null}
     </>
   );
+}
+
+function SeriesRail({ series }: { series: Series[] }) {
+  return <section className="catalog-section" aria-labelledby="rail-popular-series"><h2 id="rail-popular-series">Популярные сериалы</h2><div className="rail">{series.map((item) => <SeriesCard series={item} key={item.id} />)}<a className="show-more-card focusable" href="/series"><span aria-hidden="true">→</span><strong>Показать ещё</strong><small>Все сериалы</small></a></div></section>;
 }
 
 function interleavePopular(movies: Movie[], series: Series[]): Array<Movie | Series> {
@@ -1131,9 +1136,6 @@ export function App({
           </a>
           <a className="focusable" href="/watchlist">
             Буду смотреть
-          </a>
-          <a className="focusable" href="/series">
-            Сериалы
           </a>
           <a className="focusable" href="/search">
             Поиск
