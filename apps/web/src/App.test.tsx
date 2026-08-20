@@ -338,6 +338,13 @@ describe("playback panel", () => {
     expect(externalPlayerUrl(target, "video/*", "Mozilla/5.0 (Linux; Android 11)", "https://msx.benzac.de/"))
       .toBe(target);
   });
+  it("builds a private playback URI only for the thin Android TV app", () => {
+    const target = files[0]!.streamUrl;
+    const uri = externalPlayerUrl(target, "video/*", "Android KinoHubTV/0.1", "");
+    expect(uri).toMatch(/^kinohub-player:\/\/play\?/);
+    expect(new URL(uri).searchParams.get("url")).toBe(target);
+    expect(new URL(uri).searchParams.get("mime")).toBe("video/*");
+  });
   it("offers deterministic multi-file selection then safe launch fallbacks", () => {
     render(
       <PlaybackPanel

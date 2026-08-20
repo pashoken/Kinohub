@@ -1,5 +1,8 @@
 # KinoHub TV
 
+The optional ultra-thin Android TV wrapper and sideload instructions are documented in
+[`docs/android-tv.md`](docs/android-tv.md).
+
 KinoHub — локальный TV-first каталог для домашней сети. В режиме `mock` он работает без сторонних сервисов и секретов.
 
 ## Нативный запуск

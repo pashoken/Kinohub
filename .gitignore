@@ -8,3 +8,8 @@ artifacts/screenshots/*.png
 artifacts/reports/*.json
 playwright-report/
 test-results/
+.gradle/
+local.properties
+apps/android/app/build/
+.android-tooling/
+artifacts/apk/*.apk

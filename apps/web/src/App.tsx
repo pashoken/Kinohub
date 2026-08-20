@@ -450,6 +450,10 @@ export function externalPlayerUrl(
   userAgent = navigator.userAgent,
   referrer = document.referrer,
 ): string {
+  if (/KinoHubTV\//i.test(userAgent)) {
+    const params = new URLSearchParams({ url: target, mime: mimeType });
+    return `kinohub-player://play?${params}`;
+  }
   const android = /Android/i.test(userAgent);
   const embeddedWebView =
     /\bwv\b|; wv\)|Version\/4\.0.*Chrome/i.test(userAgent) ||
