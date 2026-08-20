@@ -95,3 +95,14 @@ test("horizontal arrows stay inside a rail and scroll it", async ({ page }) => {
   await expect(page.locator("header nav a:focus")).toHaveCount(0);
   await expect(page.locator(".brand:focus")).toHaveCount(0);
 });
+
+test("vertical arrows move between rails before the fixed header", async ({ page }) => {
+  await page.goto("/");
+  const rails = page.locator(".catalog-section .rail");
+  const firstRailCard = rails.nth(0).locator(".card").first();
+  const secondRailCard = rails.nth(1).locator(".card").first();
+  await secondRailCard.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(firstRailCard).toBeFocused();
+  await expect(page.locator("header nav a:focus")).toHaveCount(0);
+});

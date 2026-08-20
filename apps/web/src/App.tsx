@@ -273,7 +273,7 @@ export function RequestAction({
   };
   if (state === "idle")
     return (
-      <button className="primary focusable" onClick={() => setState("confirm")}>
+      <button className="secondary focusable download-action" onClick={() => setState("confirm")}>
         Скачать 1080p
       </button>
     );
@@ -673,18 +673,24 @@ export function MovieDetails({
             }
           />
           <button
-            className="secondary focusable"
+            className="primary focusable movie-action"
             data-page-autofocus
             onClick={() => setShowChoices(true)}
           >
+            <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 5v14l11-7z" />
+            </svg>
             Смотреть сейчас
           </button>
           <button
-            className={`secondary focusable watchlist-action ${watchlisted ? "is-watchlisted" : ""}`}
+            className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`}
             aria-pressed={watchlisted}
             onClick={() => onToggleWatchlist?.(movie)}
           >
-            {watchlisted ? "✓ Буду смотреть" : "＋ Буду смотреть"}
+            <svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 3.75h12v17l-6-4-6 4z" />
+            </svg>
+            {watchlisted ? "В списке" : "Буду смотреть"}
           </button>
         </div>
       </div>

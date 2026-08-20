@@ -91,6 +91,32 @@ export function useSpatialNavigation() {
           return;
         }
       }
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        const currentRail = current.closest<HTMLElement>(".rail");
+        if (currentRail) {
+          const rails = [...document.querySelectorAll<HTMLElement>(".rail")];
+          const railIndex = rails.indexOf(currentRail);
+          const offset = event.key === "ArrowUp" ? -1 : 1;
+          const targetRail = rails[railIndex + offset];
+          if (targetRail) {
+            const from = current.getBoundingClientRect();
+            const fromX = from.left + from.width / 2;
+            const target = [...targetRail.querySelectorAll<HTMLElement>(focusSelector)]
+              .filter(visible)
+              .sort((left, right) => {
+                const leftRect = left.getBoundingClientRect();
+                const rightRect = right.getBoundingClientRect();
+                return Math.abs(leftRect.left + leftRect.width / 2 - fromX)
+                  - Math.abs(rightRect.left + rightRect.width / 2 - fromX);
+              })[0];
+            if (target) {
+              event.preventDefault();
+              focusAndReveal(target, "nearest");
+              return;
+            }
+          }
+        }
+      }
       const from = current.getBoundingClientRect();
       const fx = from.left + from.width / 2;
       const fy = from.top + from.height / 2;

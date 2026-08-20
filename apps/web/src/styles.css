@@ -248,9 +248,42 @@ input:focus-visible {
   gap: 16px;
   margin-top: 34px;
 }
-.watchlist-action.is-watchlisted {
-  background: rgba(157, 181, 255, 0.22);
+.movie-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.action-icon {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  fill: currentColor;
+}
+.download-action {
+  color: #c3cad8;
+  background: rgba(255, 255, 255, 0.075);
+  font-weight: 500;
+}
+.watchlist-action {
   color: #dce5ff;
+  border: 1px solid rgba(157, 181, 255, 0.5);
+  background: rgba(157, 181, 255, 0.16);
+  font-weight: 800;
+}
+.watchlist-action .bookmark-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.watchlist-action.is-watchlisted {
+  color: #101522;
+  background: var(--focus);
+  border-color: var(--focus);
+}
+.watchlist-action.is-watchlisted .bookmark-icon {
+  fill: currentColor;
 }
 .watchlist-page {
   padding-top: 34px;

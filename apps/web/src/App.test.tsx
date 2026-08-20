@@ -53,6 +53,9 @@ describe("catalog surfaces", () => {
     expect(screen.getByText("Фантастика · Приключения")).toBeInTheDocument();
     expect(screen.getByText(movie.overview)).toBeInTheDocument();
     expect(screen.getByText("Не добавлен")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Смотреть сейчас" })).toHaveClass("primary");
+    expect(screen.getByRole("button", { name: "Скачать 1080p" })).toHaveClass("download-action");
+    expect(screen.getByRole("button", { name: "Буду смотреть" })).toHaveClass("watchlist-action");
   });
 
   it("autofocuses Watch now on movie details", async () => {
@@ -63,8 +66,8 @@ describe("catalog surfaces", () => {
   it("persists movies in Буду смотреть and renders the separate page", async () => {
     const movie = fixtureCatalog.rails[0]!.movies[0]!;
     render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
-    fireEvent.click(screen.getByRole("button", { name: "＋ Буду смотреть" }));
-    expect(screen.getByRole("button", { name: "✓ Буду смотреть" })).toHaveAttribute(
+    fireEvent.click(screen.getByRole("button", { name: "Буду смотреть" }));
+    expect(screen.getByRole("button", { name: "В списке" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
