@@ -91,7 +91,7 @@ describe("catalog surfaces", () => {
   it("renders an honest empty Буду смотреть state", () => {
     render(<App initialCatalog={fixtureCatalog} initialPath="/watchlist" />);
     expect(screen.getByRole("heading", { name: "Здесь пока пусто" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Перейти к фильмам" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Перейти к каталогу" })).toBeInTheDocument();
   });
   it("renders missing poster and backdrop fallbacks", () => {
     const movie = fixtureCatalog.rails[1]!.movies[0]!;

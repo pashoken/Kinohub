@@ -12,6 +12,7 @@ const statusCopy: Record<Movie["mediaStatus"], string> = {
   failed: "Ошибка загрузки",
 };
 const watchlistStorageKey = "kinohub-watchlist-v1";
+const seriesWatchlistStorageKey = "kinohub-series-watchlist-v1";
 const watchedEpisodesStorageKey = "kinohub-watched-episodes-v1";
 const seriesPacksStorageKey = "kinohub-series-packs-v1";
 
@@ -41,6 +42,10 @@ function readWatchlist(): Movie[] {
   } catch {
     return [];
   }
+}
+function readSeriesWatchlist(): Series[] {
+  try { const value = localStorage.getItem(seriesWatchlistStorageKey); return value ? JSON.parse(value) as Series[] : []; }
+  catch { return []; }
 }
 
 export function MoviePoster({ movie }: { movie: Movie }) {
@@ -796,7 +801,7 @@ export function MovieDetails({
   );
 }
 
-function SeriesDetails({ series }: { series: Series }) {
+function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { series: Series; watchlisted?: boolean; onToggleWatchlist?: (series: Series) => void }) {
   const seasons = series.seasons.filter((item) => item.seasonNumber > 0 && item.episodeCount > 0);
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [showChoices, setShowChoices] = useState(false);
@@ -815,6 +820,7 @@ function SeriesDetails({ series }: { series: Series }) {
         <div className="episode-picker" aria-label="Выбор серии">
           <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
           <button className="primary focusable movie-action" data-page-autofocus onClick={() => savedPack ? setUseSavedPack(true) : setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
+          <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
         {savedPack ? <p className="saved-pack">Закреплена раздача: {savedPack.releaseName}</p> : null}
@@ -833,22 +839,23 @@ function SeriesCatalog() {
   return <section className="rail-page series-page"><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid">{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div></section>;
 }
 
-export function WatchlistPage({ movies }: { movies: Movie[] }) {
+export function WatchlistPage({ movies, series = [] }: { movies: Movie[]; series?: Series[] }) {
   return (
     <section className="watchlist-page" aria-labelledby="watchlist-title">
       <p className="eyebrow">МОЯ КОЛЛЕКЦИЯ</p>
       <h1 id="watchlist-title">Буду смотреть</h1>
-      {movies.length ? (
+      {movies.length || series.length ? (
         <div className="movie-grid">
           {movies.map((movie, index) => (
             <MovieCard movie={movie} key={movie.id} pageAutoFocus={index === 0} />
           ))}
+          {series.map((item, index) => <SeriesCard series={item} key={`series-${item.id}`} pageAutoFocus={!movies.length && index === 0} />)}
         </div>
       ) : (
         <div className="empty watchlist-empty">
           <h2>Здесь пока пусто</h2>
-          <p>Добавляйте фильмы кнопкой «＋ Буду смотреть».</p>
-          <a className="primary link-button focusable" href="/" data-page-autofocus>Перейти к фильмам</a>
+          <p>Добавляйте фильмы и сериалы кнопкой «Буду смотреть».</p>
+          <a className="primary link-button focusable" href="/" data-page-autofocus>Перейти к каталогу</a>
         </div>
       )}
     </section>
@@ -876,7 +883,7 @@ function Recommendations({ movieId }: { movieId: string }) {
   );
 }
 
-export function Home({ catalog }: { catalog: Catalog }) {
+export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Series[] }) {
   return (
     <>
       <section className="hero" aria-labelledby="welcome-title">
@@ -892,15 +899,24 @@ export function Home({ catalog }: { catalog: Catalog }) {
         >
           <h2 id={`rail-${rail.id}`}>{rail.title}</h2>
           <div className="rail">
-            {rail.movies.map((movie, movieIndex) => (
-              <MovieCard movie={movie} key={movie.id} pageAutoFocus={railIndex === 0 && movieIndex === 0} />
-            ))}
+            {rail.id === "popular" ? interleavePopular(rail.movies, series.slice(0, 8)).map((item, itemIndex) => "numberOfSeasons" in item
+              ? <SeriesCard series={item} key={`series-${item.id}`} pageAutoFocus={railIndex === 0 && itemIndex === 0} />
+              : <MovieCard movie={item} key={`movie-${item.id}`} pageAutoFocus={railIndex === 0 && itemIndex === 0} />)
+              : rail.movies.map((movie, movieIndex) => <MovieCard movie={movie} key={movie.id} pageAutoFocus={railIndex === 0 && movieIndex === 0} />)}
             <ShowMoreCard railId={rail.id} title={rail.title} />
           </div>
         </section>
       ))}
+      {series.length ? <section className="catalog-section" aria-labelledby="rail-popular-series"><h2 id="rail-popular-series">Популярные сериалы</h2><div className="rail">{series.map((item) => <SeriesCard series={item} key={item.id} />)}<a className="show-more-card focusable" href="/series"><span aria-hidden="true">→</span><strong>Показать ещё</strong><small>Все сериалы</small></a></div></section> : null}
     </>
   );
+}
+
+function interleavePopular(movies: Movie[], series: Series[]): Array<Movie | Series> {
+  const result: Array<Movie | Series> = [];
+  const length = Math.max(movies.length, series.length);
+  for (let index = 0; index < length; index += 1) { if (movies[index]) result.push(movies[index]!); if (series[index]) result.push(series[index]!); }
+  return result;
 }
 
 function RailPage({ rail }: { rail: Catalog["rails"][number] }) {
@@ -1033,7 +1049,9 @@ export function App({
   const path = initialPath ?? window.location.pathname;
   const [routeMovie, setRouteMovie] = useState<Movie>();
   const [routeSeries, setRouteSeries] = useState<Series>();
+  const [homeSeries, setHomeSeries] = useState<Series[]>([]);
   const [watchlist, setWatchlist] = useState<Movie[]>(readWatchlist);
+  const [seriesWatchlist, setSeriesWatchlist] = useState<Series[]>(readSeriesWatchlist);
   const toggleWatchlist = useCallback((selected: Movie) => {
     setWatchlist((current) => {
       const next = current.some((item) => item.id === selected.id)
@@ -1042,6 +1060,9 @@ export function App({
       localStorage.setItem(watchlistStorageKey, JSON.stringify(next));
       return next;
     });
+  }, []);
+  const toggleSeriesWatchlist = useCallback((selected: Series) => {
+    setSeriesWatchlist((current) => { const next = current.some((item) => item.id === selected.id) ? current.filter((item) => item.id !== selected.id) : [selected, ...current]; localStorage.setItem(seriesWatchlistStorageKey, JSON.stringify(next)); return next; });
   }, []);
   useEffect(() => {
     if (initialCatalog || forcedState) return;
@@ -1061,6 +1082,12 @@ export function App({
       });
     return () => controller.abort();
   }, [initialCatalog, forcedState]);
+  useEffect(() => {
+    if (state !== "ready" || initialCatalog) return;
+    const controller = new AbortController();
+    fetch("/api/series", { signal: controller.signal }).then((response) => response.ok ? response.json() as Promise<{ series: Series[] }> : { series: [] }).then((payload) => setHomeSeries(payload.series)).catch(() => undefined);
+    return () => controller.abort();
+  }, [state, initialCatalog]);
   const movie = useMemo(() => {
     const id = path.match(/^\/movies\/([^/]+)/)?.[1];
     return id
@@ -1134,9 +1161,9 @@ export function App({
       ) : null}
       {state === "ready" && path === "/search" ? <Search /> : null}
       {state === "ready" && path === "/setup" ? <SetupDiagnostics /> : null}
-      {state === "ready" && path === "/watchlist" ? <WatchlistPage movies={watchlist} /> : null}
+      {state === "ready" && path === "/watchlist" ? <WatchlistPage movies={watchlist} series={seriesWatchlist} /> : null}
       {state === "ready" && path === "/series" ? <SeriesCatalog /> : null}
-      {state === "ready" && path.startsWith("/series/") && routeSeries ? <SeriesDetails series={routeSeries} /> : null}
+      {state === "ready" && path.startsWith("/series/") && routeSeries ? <SeriesDetails series={routeSeries} watchlisted={seriesWatchlist.some((item) => item.id === routeSeries.id)} onToggleWatchlist={toggleSeriesWatchlist} /> : null}
       {state === "ready" && path.startsWith("/series/") && !routeSeries ? <section className="empty"><h1>Загружаем сериал…</h1></section> : null}
       {state === "ready" && path.startsWith("/movies/") && activeMovie ? (
         <MovieDetails
@@ -1152,7 +1179,7 @@ export function App({
         </section>
       ) : null}
       {state === "ready" && path === "/" && catalog ? (
-        <Home catalog={catalog} />
+        <Home catalog={catalog} series={homeSeries} />
       ) : null}
       {state === "ready" && activeRail ? <RailPage rail={activeRail} /> : null}
     </main>
