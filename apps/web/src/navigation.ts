@@ -138,7 +138,11 @@ export function usePageFocus(key: string, active = true) {
       if (document.querySelector('[role="dialog"]')) return;
       const preferred = document.querySelector<HTMLElement>("[data-page-autofocus]");
       const fallback = document.querySelector<HTMLElement>(`main ${focusSelector}`);
-      focusAndReveal(preferred ?? fallback);
+      const target = preferred ?? fallback;
+      focusAndReveal(
+        target,
+        target?.dataset.pageAutofocusBlock === "nearest" ? "nearest" : "center",
+      );
     });
   }, [key, active]);
 }

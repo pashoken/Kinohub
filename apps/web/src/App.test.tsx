@@ -22,7 +22,10 @@ import {
   TorrentChoiceDrawer,
 } from "./App.js";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 describe("catalog surfaces", () => {
   it("autofocuses the first movie on the home page", async () => {
@@ -56,6 +59,26 @@ describe("catalog surfaces", () => {
     const movie = fixtureCatalog.rails[0]!.movies[0]!;
     render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Смотреть сейчас" })));
+  });
+  it("persists movies in Буду смотреть and renders the separate page", async () => {
+    const movie = fixtureCatalog.rails[0]!.movies[0]!;
+    render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
+    fireEvent.click(screen.getByRole("button", { name: "＋ Буду смотреть" }));
+    expect(screen.getByRole("button", { name: "✓ Буду смотреть" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(localStorage.getItem("kinohub-watchlist-v1")).toContain(movie.id);
+    cleanup();
+    render(<App initialCatalog={fixtureCatalog} initialPath="/watchlist" />);
+    const savedMovie = screen.getByRole("link", { name: new RegExp(movie.title) });
+    expect(savedMovie).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(savedMovie));
+  });
+  it("renders an honest empty Буду смотреть state", () => {
+    render(<App initialCatalog={fixtureCatalog} initialPath="/watchlist" />);
+    expect(screen.getByRole("heading", { name: "Здесь пока пусто" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Перейти к фильмам" })).toBeInTheDocument();
   });
   it("renders missing poster and backdrop fallbacks", () => {
     const movie = fixtureCatalog.rails[1]!.movies[0]!;

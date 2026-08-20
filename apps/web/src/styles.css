@@ -35,8 +35,9 @@ a {
 }
 main {
   min-height: 100vh;
-  padding: 96px clamp(42px, 6vw, 108px) 64px;
+  padding: 96px clamp(42px, 6vw, 108px) 140px;
   overflow-x: clip;
+  scroll-padding-block: 96px 140px;
 }
 header {
   position: fixed;
@@ -112,7 +113,9 @@ h2 {
   gap: 20px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 10px 5px 24px;
+  margin-inline: -12px;
+  padding: 12px 12px 32px;
+  scroll-padding-inline: 12px;
   scroll-snap-type: x mandatory;
 }
 .rail::-webkit-scrollbar {
@@ -192,11 +195,11 @@ input:focus-visible {
   outline-offset: 4px;
 }
 .details {
-  min-height: calc(100vh - 130px);
-  margin: 24px calc(clamp(42px, 6vw, 108px) * -1) -64px;
-  padding: 30px clamp(42px, 6vw, 108px) 80px;
+  min-height: calc(100vh - 72px);
+  margin: -24px calc(clamp(42px, 6vw, 108px) * -1) -140px;
+  padding: 28px clamp(42px, 6vw, 108px) 140px;
   background-size: cover;
-  background-position: center;
+  background-position: center top;
 }
 .missing-backdrop {
   background: radial-gradient(circle at 80% 20%, #26375c, transparent 42%);
@@ -209,27 +212,55 @@ input:focus-visible {
 }
 .detail-content {
   max-width: 780px;
-  padding-top: clamp(60px, 12vh, 150px);
+  padding-top: clamp(22px, 4vh, 46px);
 }
 .recommendations {
-  margin-top: clamp(90px, 16vh, 180px);
+  margin-top: clamp(48px, 7vh, 82px);
   padding-top: 24px;
   background: linear-gradient(180deg, transparent, rgba(8, 11, 18, 0.88) 18%);
 }
 .detail-content h1 {
-  margin-bottom: 20px;
+  margin: 10px 0 14px;
+}
+.detail-status {
+  margin-bottom: 0;
+}
+.detail-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
 }
 .meta,
 .genres {
-  font-size: 20px;
+  font-size: 18px;
 }
 .overview {
-  max-width: 720px;
+  max-width: 660px;
+  margin: 14px 0 0;
+  font-size: clamp(18px, 1.35vw, 22px);
+  line-height: 1.45;
 }
 .actions {
+  flex-wrap: wrap;
   display: flex;
   gap: 16px;
   margin-top: 34px;
+}
+.watchlist-action.is-watchlisted {
+  background: rgba(157, 181, 255, 0.22);
+  color: #dce5ff;
+}
+.watchlist-page {
+  padding-top: 34px;
+}
+.watchlist-page h1 {
+  margin-top: 8px;
+}
+.watchlist-empty {
+  max-width: 620px;
+  padding-top: 28px;
 }
 .request-sheet {
   position: fixed;

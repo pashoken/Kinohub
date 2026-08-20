@@ -11,6 +11,16 @@ const statusCopy: Record<Movie["mediaStatus"], string> = {
   available: "Доступен",
   failed: "Ошибка загрузки",
 };
+const watchlistStorageKey = "kinohub-watchlist-v1";
+
+function readWatchlist(): Movie[] {
+  try {
+    const value = localStorage.getItem(watchlistStorageKey);
+    return value ? (JSON.parse(value) as Movie[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function MoviePoster({ movie }: { movie: Movie }) {
   const [failed, setFailed] = useState(false);
@@ -42,7 +52,9 @@ export function MovieCard({ movie, pageAutoFocus = false }: { movie: Movie; page
       className="card focusable"
       href={`/movies/${movie.id}`}
       data-focusable="true"
-      {...(pageAutoFocus ? { "data-page-autofocus": true } : {})}
+      {...(pageAutoFocus
+        ? { "data-page-autofocus": true, "data-page-autofocus-block": "nearest" }
+        : {})}
     >
       <MoviePoster movie={movie} />
       <strong>{movie.title}</strong>
@@ -618,7 +630,15 @@ export function PlaybackPanel({
   );
 }
 
-export function MovieDetails({ movie }: { movie: Movie }) {
+export function MovieDetails({
+  movie,
+  watchlisted = false,
+  onToggleWatchlist,
+}: {
+  movie: Movie;
+  watchlisted?: boolean;
+  onToggleWatchlist?: (movie: Movie) => void;
+}) {
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
   const backdropStyle = movie.backdropUrl
@@ -635,11 +655,13 @@ export function MovieDetails({ movie }: { movie: Movie }) {
         ← На главную
       </a>
       <div className="detail-content">
-        <p className="eyebrow">{statusCopy[movie.mediaStatus]}</p>
+        <p className="eyebrow detail-status">{statusCopy[movie.mediaStatus]}</p>
         <h1>{movie.title}</h1>
-        <p className="meta">{movie.year}{movie.runtimeMinutes ? ` · ${movie.runtimeMinutes} мин` : ""}</p>
-        <Ratings movie={movie} />
-        <p className="genres">{movie.genres.join(" · ") || "Жанр не указан"}</p>
+        <div className="detail-facts">
+          <span className="meta">{movie.year}{movie.runtimeMinutes ? ` · ${movie.runtimeMinutes} мин` : ""}</span>
+          <Ratings movie={movie} />
+          <span className="genres">{movie.genres.join(" · ") || "Жанр не указан"}</span>
+        </div>
         <p className="overview">
           {movie.overview || "Описание пока недоступно."}
         </p>
@@ -656,6 +678,13 @@ export function MovieDetails({ movie }: { movie: Movie }) {
             onClick={() => setShowChoices(true)}
           >
             Смотреть сейчас
+          </button>
+          <button
+            className={`secondary focusable watchlist-action ${watchlisted ? "is-watchlisted" : ""}`}
+            aria-pressed={watchlisted}
+            onClick={() => onToggleWatchlist?.(movie)}
+          >
+            {watchlisted ? "✓ Буду смотреть" : "＋ Буду смотреть"}
           </button>
         </div>
       </div>
@@ -677,6 +706,28 @@ export function MovieDetails({ movie }: { movie: Movie }) {
       ) : null}
       <Recommendations movieId={movie.id} />
     </article>
+  );
+}
+
+export function WatchlistPage({ movies }: { movies: Movie[] }) {
+  return (
+    <section className="watchlist-page" aria-labelledby="watchlist-title">
+      <p className="eyebrow">МОЯ КОЛЛЕКЦИЯ</p>
+      <h1 id="watchlist-title">Буду смотреть</h1>
+      {movies.length ? (
+        <div className="movie-grid">
+          {movies.map((movie, index) => (
+            <MovieCard movie={movie} key={movie.id} pageAutoFocus={index === 0} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty watchlist-empty">
+          <h2>Здесь пока пусто</h2>
+          <p>Добавляйте фильмы кнопкой «＋ Буду смотреть».</p>
+          <a className="primary link-button focusable" href="/" data-page-autofocus>Перейти к фильмам</a>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -857,6 +908,16 @@ export function App({
   );
   const path = initialPath ?? window.location.pathname;
   const [routeMovie, setRouteMovie] = useState<Movie>();
+  const [watchlist, setWatchlist] = useState<Movie[]>(readWatchlist);
+  const toggleWatchlist = useCallback((selected: Movie) => {
+    setWatchlist((current) => {
+      const next = current.some((item) => item.id === selected.id)
+        ? current.filter((item) => item.id !== selected.id)
+        : [selected, ...current];
+      localStorage.setItem(watchlistStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }, []);
   useEffect(() => {
     if (initialCatalog || forcedState) return;
     const controller = new AbortController();
@@ -907,6 +968,9 @@ export function App({
           <a className="focusable" href="/">
             Главная
           </a>
+          <a className="focusable" href="/watchlist">
+            Буду смотреть
+          </a>
           <a className="focusable" href="/search">
             Поиск
           </a>
@@ -933,8 +997,13 @@ export function App({
       ) : null}
       {state === "ready" && path === "/search" ? <Search /> : null}
       {state === "ready" && path === "/setup" ? <SetupDiagnostics /> : null}
+      {state === "ready" && path === "/watchlist" ? <WatchlistPage movies={watchlist} /> : null}
       {state === "ready" && path.startsWith("/movies/") && activeMovie ? (
-        <MovieDetails movie={activeMovie} />
+        <MovieDetails
+          movie={activeMovie}
+          watchlisted={watchlist.some((item) => item.id === activeMovie.id)}
+          onToggleWatchlist={toggleWatchlist}
+        />
       ) : null}
       {state === "ready" && path.startsWith("/movies/") && !activeMovie ? (
         <section className="empty">
