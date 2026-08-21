@@ -61,7 +61,12 @@ export class SeerrClient {
   }
 
   async discoverSeries(page = 1): Promise<Series[]> {
-    const payload = await this.call<{ results: unknown[] }>(`/api/v1/discover/tv?page=${page}&sortBy=popularity.desc`);
+    const params = new URLSearchParams({
+      page: String(page),
+      sortBy: 'popularity.desc',
+      voteCountGte: '500'
+    });
+    const payload = await this.call<{ results: unknown[] }>(`/api/v1/discover/tv?${params}`);
     return normalizeSeriesList(payload.results);
   }
 

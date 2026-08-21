@@ -428,6 +428,13 @@ describe("playback panel", () => {
     fireEvent.click(screen.getByRole("link", { name: "Выбрать плеер" }));
     expect(localStorage.getItem("kinohub-watched-episodes-v1")).toContain("108978:S1:E2");
   });
+  it("opens the requested next episode immediately", () => {
+    const episodeTwo = { ...files[0]!, path: "Reacher.S01E02.mkv" };
+    const episodeThree = { ...files[1]!, path: "Reacher.S01E03.mkv" };
+    render(<PlaybackPanel initialResult={{ status: "choose_file", files: [episodeTwo, episodeThree] }} initialFilePath={episodeThree.path} seriesContext={{ seriesId: "108978", season: 1 }} onClose={() => undefined} />);
+    expect(screen.getByText(episodeThree.path)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Выбрать плеер" })).toBeInTheDocument();
+  });
   it("renders single-file ready and timeout retry/diagnostics states", () => {
     const ready = render(
       <PlaybackPanel

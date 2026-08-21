@@ -545,6 +545,7 @@ export function PlaybackPanel({
   onResolved,
   releaseInfo,
   initialResult,
+  initialFilePath,
   initialError,
   onClose,
 }: {
@@ -553,6 +554,7 @@ export function PlaybackPanel({
   onResolved?: (result: PlaybackResult) => void;
   releaseInfo?: TorrentChoice | undefined;
   initialResult?: PlaybackResult;
+  initialFilePath?: string;
   initialError?: string;
   onClose: () => void;
 }) {
@@ -561,7 +563,11 @@ export function PlaybackPanel({
   );
   const [error, setError] = useState(initialError);
   const [selected, setSelected] = useState<PlaybackFile | undefined>(
-    initialResult?.status === "ready" ? initialResult.files[0] : undefined,
+    initialResult?.status === "ready"
+      ? initialResult.files[0]
+      : initialResult?.status === "choose_file"
+        ? initialResult.files.find((file) => file.path === initialFilePath)
+        : undefined,
   );
   const [watched, setWatched] = useState(readWatchedEpisodes);
   const autoStartedRef = useRef(false);
@@ -828,6 +834,19 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
   const [selectedRelease, setSelectedRelease] = useState<TorrentChoice>();
   const [savedPack, setSavedPack] = useState<SavedSeriesPack | undefined>(() => readSeriesPacks()[series.id]);
   const [useSavedPack, setUseSavedPack] = useState(false);
+  const [continueFilePath, setContinueFilePath] = useState<string>();
+  const [watchProgressRevision, setWatchProgressRevision] = useState(0);
+  const nextEpisode = useMemo(() => {
+    void watchProgressRevision;
+    if (!savedPack) return undefined;
+    const watched = readWatchedEpisodes();
+    if (![...watched].some((key) => key.startsWith(`${series.id}:`))) return undefined;
+    return savedPack.files
+      .map((file) => ({ file, info: episodeFileInfo(file.path) }))
+      .filter((item): item is { file: PlaybackFile; info: { season: number; episode: number } } => Boolean(item.info))
+      .sort((left, right) => left.info.season - right.info.season || left.info.episode - right.info.episode)
+      .find((item) => !watched.has(watchedEpisodeKey(series.id, item.info.season, item.info.episode)));
+  }, [savedPack, series.id, watchProgressRevision]);
   useEffect(() => {
     if (!savedPack || savedPack.series) return;
     const enriched = { ...savedPack, series }; saveSeriesPack(series.id, enriched); setSavedPack(enriched);
@@ -841,8 +860,9 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
         <div className="detail-facts"><span className="meta">{series.year}{series.episodeRuntimeMinutes ? ` · ~${series.episodeRuntimeMinutes} мин` : ""}</span><Ratings movie={series} /><span className="genres">{series.genres.join(" · ")}</span></div>
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
         <div className="episode-picker" aria-label="Выбор серии">
+          {nextEpisode ? <button className="primary focusable movie-action continue-action" data-page-autofocus onClick={() => { setSeason(nextEpisode.info.season); setContinueFilePath(nextEpisode.file.path); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Продолжить просмотр · {nextEpisode.info.season} сезон, {nextEpisode.info.episode} серия</button> : null}
           <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
-          <button className="primary focusable movie-action" data-page-autofocus onClick={() => savedPack ? setUseSavedPack(true) : setShowChoices(true)}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
+          <button className="primary focusable movie-action" {...(!nextEpisode ? { "data-page-autofocus": true } : {})} onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
@@ -850,16 +870,33 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
       </div>
       {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id, choice) => { setShowChoices(false); setReleaseName(choice.releaseName); setSelectedRelease(choice); setChoiceId(id); }} /> : null}
       {choiceId ? <PlaybackPanel choiceId={choiceId} releaseInfo={selectedRelease} seriesContext={{ seriesId: series.id, season }} onResolved={(result) => { const pack = { releaseName, files: result.files, releaseInfo: selectedRelease, series }; saveSeriesPack(series.id, pack); setSavedPack(pack); }} onClose={() => setChoiceId(undefined)} /> : null}
-      {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} releaseInfo={savedPack.releaseInfo} seriesContext={{ seriesId: series.id, season }} onClose={() => setUseSavedPack(false)} /> : null}
+      {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} {...(continueFilePath ? { initialFilePath: continueFilePath } : {})} releaseInfo={savedPack.releaseInfo} seriesContext={{ seriesId: series.id, season }} onClose={() => { setUseSavedPack(false); setContinueFilePath(undefined); setWatchProgressRevision((value) => value + 1); }} /> : null}
     </article>
   );
 }
 
 function SeriesCatalog() {
   const [series, setSeries] = useState<Series[]>();
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
-  useEffect(() => { const controller = new AbortController(); fetch("/api/series", { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error("series"); return response.json() as Promise<{ series: Series[] }>; }).then((payload) => setSeries(payload.series)).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setFailed(true); }); return () => controller.abort(); }, []);
-  return <section className="rail-page series-page"><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid">{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div></section>;
+  useEffect(() => { const controller = new AbortController(); fetch("/api/series?page=1", { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error("series"); return response.json() as Promise<{ series: Series[]; hasMore: boolean }>; }).then((payload) => { setSeries(payload.series); setHasMore(payload.hasMore); }).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setFailed(true); }); return () => controller.abort(); }, []);
+  const loadMore = async () => {
+    if (pending || !hasMore) return;
+    setPending(true);
+    try {
+      const next = page + 1;
+      const response = await fetch(`/api/series?page=${next}`);
+      if (!response.ok) throw new Error("series");
+      const payload = await response.json() as { series: Series[]; hasMore: boolean };
+      setSeries((current) => [...(current ?? []), ...payload.series.filter((candidate) => !current?.some((item) => item.id === candidate.id))]);
+      setPage(next);
+      setHasMore(payload.hasMore);
+    } catch { setFailed(true); }
+    finally { setPending(false); }
+  };
+  return <section className="rail-page series-page"><a className="back focusable" href="/">← На главную</a><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid">{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div>{hasMore && series?.length ? <button className="primary focusable load-more" onClick={() => void loadMore()} disabled={pending}>{pending ? "Загружаем…" : "Показать ещё сериалы"}</button> : null}</section>;
 }
 
 export function WatchlistPage({ movies, series = [] }: { movies: Movie[]; series?: Series[] }) {
