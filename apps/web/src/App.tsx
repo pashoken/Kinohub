@@ -197,12 +197,25 @@ export function buildRecommendations(candidates: MediaItem[], profile: TasteProf
   }
   const averageLikedRating = liked.reduce((sum, item) => sum + item.rating, 0) / liked.length;
   return unique
-    .filter((item) => profile[mediaKey(item)] === undefined)
-    .map((item) => ({ item, score: item.genres.reduce((sum, genre) => sum + (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0), 0) + Math.max(0, 3 - Math.abs(item.rating - averageLikedRating)) + item.rating / 20 }))
-    .filter(({ score }) => score > 0)
+    .filter((item) => profile[mediaKey(item)] === undefined && hasReadableLocalizedTitle(item.title))
+    .map((item) => {
+      const genreSignals = item.genres.map((genre) => genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0);
+      const positiveGenreSignal = genreSignals.filter((signal) => signal > 0).reduce((sum, signal) => sum + signal, 0);
+      const negativeGenreSignal = genreSignals.filter((signal) => signal < 0).reduce((sum, signal) => sum + signal, 0);
+      const score = positiveGenreSignal * 2 + negativeGenreSignal * 2 + Math.max(0, 2 - Math.abs(item.rating - averageLikedRating)) + item.rating / 25;
+      return { item, score, positiveGenreSignal };
+    })
+    .filter(({ score, positiveGenreSignal }) => score > 0 && positiveGenreSignal > 0)
     .sort((left, right) => right.score - left.score || right.item.rating - left.item.rating)
     .slice(0, limit)
     .map(({ item }) => item);
+}
+
+export function hasReadableLocalizedTitle(title: string): boolean {
+  const letters = [...title].filter((character) => /\p{L}/u.test(character));
+  if (!letters.length) return false;
+  const readable = letters.filter((character) => /[A-Za-zА-Яа-яЁё]/u.test(character));
+  return readable.length / letters.length >= 0.7;
 }
 
 function ContextBack() {

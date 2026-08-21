@@ -18,6 +18,7 @@ import {
   episodeFileMatches,
   episodeFileInfo,
   Home,
+  hasReadableLocalizedTitle,
   MovieDetails,
   MoviePoster,
   PlaybackPanel,
@@ -41,6 +42,11 @@ afterEach(() => {
 });
 
 describe("catalog surfaces", () => {
+  it("filters recommendation titles without Russian or Latin localization", () => {
+    expect(hasReadableLocalizedTitle("Менталист")).toBe(true);
+    expect(hasReadableLocalizedTitle("Ted Lasso")).toBe(true);
+    expect(hasReadableLocalizedTitle("வில்லவராயன் & சூர்யா")).toBe(false);
+  });
   it("recommends unrated titles with genres preferred by the viewer", () => {
     const liked = fixtureCatalog.rails[0]!.movies[0]!;
     const candidates = fixtureCatalog.rails.flatMap((rail) => rail.movies);
