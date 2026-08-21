@@ -285,10 +285,14 @@ input:focus-visible {
 .watchlist-action.is-watchlisted .bookmark-icon {
   fill: currentColor;
 }
-.taste-actions { display: flex; gap: 10px; }
 .taste-action { min-height: 52px; padding: 13px 18px; color: var(--muted); font-weight: 700; }
-.taste-action.is-active.like { background: #176b4b; color: #fff; }
-.taste-action.is-active.dislike { background: #853b45; color: #fff; }
+.taste-action.is-active { border: 1px solid #e8b84b; background: rgba(232, 184, 75, .16); color: #ffe59a; }
+.rating-dialog { position: fixed; z-index: 26; inset: 0; width: min(760px, calc(100vw - 80px)); height: max-content; margin: auto; padding: 30px; border: 1px solid #425273; border-radius: 24px; background: #0d1422; box-shadow: 0 30px 100px #000; }
+.rating-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 28px; }
+.rating-score { min-height: 76px; padding: 12px; background: #182238; font-size: 1.45rem; font-weight: 900; }
+.rating-score.is-selected { background: #e8b84b; color: #111827; }
+.rating-scale { display: flex; justify-content: space-between; color: var(--muted); font-size: .85rem; }
+.reset-rating { display: block; margin: 20px auto 0; }
 .rail-hint { margin: -14px 0 20px; color: var(--muted); font-size: .9rem; }
 .watchlist-page {
   padding-top: 34px;

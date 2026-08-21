@@ -17,13 +17,16 @@ const seriesWatchlistStorageKey = "kinohub-series-watchlist-v1";
 const watchedEpisodesStorageKey = "kinohub-watched-episodes-v1";
 const seriesPacksStorageKey = "kinohub-series-packs-v1";
 const tasteProfileStorageKey = "kinohub-taste-profile-v1";
-type TasteValue = 1 | -1;
+type TasteScore = number;
 type MediaItem = Movie | Series;
-type TasteProfile = Record<string, { value: TasteValue; item: MediaItem }>;
+type TasteProfile = Record<string, { value: TasteScore; item: MediaItem }>;
 
 function mediaKey(item: MediaItem): string { return `${"numberOfSeasons" in item ? "series" : "movie"}:${item.id}`; }
 function readTasteProfile(): TasteProfile {
-  try { return JSON.parse(localStorage.getItem(tasteProfileStorageKey) ?? "{}") as TasteProfile; }
+  try {
+    const stored = JSON.parse(localStorage.getItem(tasteProfileStorageKey) ?? "{}") as TasteProfile;
+    return Object.fromEntries(Object.entries(stored).map(([key, entry]) => [key, { ...entry, value: entry.value === -1 ? 3 : entry.value === 1 ? 8 : Math.max(1, Math.min(10, entry.value)) }]));
+  }
   catch { return {}; }
 }
 
@@ -163,21 +166,34 @@ export function detailHref(kind: "movies" | "series", id: string, source = `${wi
   return `/${kind}/${encodeURIComponent(id)}?from=${encodeURIComponent(from)}`;
 }
 
-function TasteActions({ item, value = 0, onRate }: { item: MediaItem; value?: TasteValue | 0; onRate?: ((item: MediaItem, value: TasteValue) => void) | undefined }) {
-  return <div className="taste-actions" aria-label="Ваша оценка">
-    <button className={`secondary focusable taste-action ${value === 1 ? "is-active like" : ""}`} aria-pressed={value === 1} onClick={() => onRate?.(item, 1)}><span aria-hidden="true">👍</span> Нравится</button>
-    <button className={`secondary focusable taste-action ${value === -1 ? "is-active dislike" : ""}`} aria-pressed={value === -1} onClick={() => onRate?.(item, -1)}><span aria-hidden="true">👎</span> Не нравится</button>
-  </div>;
+function TasteAction({ item, value = 0, onRate }: { item: MediaItem; value?: TasteScore | 0; onRate?: ((item: MediaItem, value: TasteScore | null) => void) | undefined }) {
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(open, dialogRef);
+  useEffect(() => {
+    if (!open) return;
+    queueMicrotask(() => focusAndReveal(dialogRef.current?.querySelector<HTMLElement>(`[data-score="${value || 8}"]`) ?? null));
+  }, [open, value]);
+  return <>
+    <button className={`secondary focusable taste-action ${value ? "is-active" : ""}`} aria-haspopup="dialog" onClick={() => setOpen(true)}><span aria-hidden="true">★</span> {value ? `Моя оценка: ${value}/10` : "Оценить"}</button>
+    {open ? <section ref={dialogRef} className="rating-dialog" role="dialog" aria-modal="true" aria-labelledby="rating-title">
+      <div className="drawer-head"><div><p className="eyebrow">ВАША ОЦЕНКА</p><h2 id="rating-title">{item.title}</h2></div><button className="secondary focusable" data-dialog-close onClick={() => setOpen(false)}>Закрыть</button></div>
+      <div className="rating-grid" aria-label="Оценка от 1 до 10">{Array.from({ length: 10 }, (_, index) => index + 1).map((score) => <button key={score} data-score={score} className={`focusable rating-score ${value === score ? "is-selected" : ""}`} aria-pressed={value === score} onClick={() => { onRate?.(item, score); setOpen(false); }}>{score}</button>)}</div>
+      <p className="rating-scale"><span>Совсем не понравилось</span><span>Любимое</span></p>
+      {value ? <button className="secondary focusable reset-rating" onClick={() => { onRate?.(item, null); setOpen(false); }}>Сбросить оценку</button> : null}
+    </section> : null}
+  </>;
 }
 
 export function buildRecommendations(candidates: MediaItem[], profile: TasteProfile, limit = 16): MediaItem[] {
   const unique = [...new Map(candidates.map((item) => [mediaKey(item), item])).values()];
   const preferences = Object.values(profile);
-  const liked = preferences.filter((entry) => entry.value === 1).map((entry) => entry.item);
+  const liked = preferences.filter((entry) => entry.value >= 7).map((entry) => entry.item);
   if (!liked.length) return [];
   const genreWeights = new Map<string, number>();
   for (const { item, value: preference } of preferences) {
-    for (const genre of item.genres) genreWeights.set(genre.toLocaleLowerCase("ru"), (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0) + (preference === 1 ? 3 : -4));
+    const signal = (preference - 5.5) / 1.5;
+    for (const genre of item.genres) genreWeights.set(genre.toLocaleLowerCase("ru"), (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0) + signal);
   }
   const averageLikedRating = liked.reduce((sum, item) => sum + item.rating, 0) / liked.length;
   return unique
@@ -794,8 +810,8 @@ export function MovieDetails({
   movie: Movie;
   watchlisted?: boolean;
   onToggleWatchlist?: (movie: Movie) => void;
-  taste?: TasteValue | 0;
-  onRate?: (item: MediaItem, value: TasteValue) => void;
+  taste?: TasteScore | 0;
+  onRate?: (item: MediaItem, value: TasteScore | null) => void;
 }) {
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
@@ -843,7 +859,7 @@ export function MovieDetails({
             </svg>
             {watchlisted ? "В списке" : "Буду смотреть"}
           </button>
-          <TasteActions item={movie} value={taste} onRate={onRate} />
+          <TasteAction item={movie} value={taste} onRate={onRate} />
           <RequestAction
             movieId={movie.id}
             initialState={
@@ -875,7 +891,7 @@ export function MovieDetails({
   );
 }
 
-function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste = 0, onRate }: { series: Series; watchlisted?: boolean; onToggleWatchlist?: (series: Series) => void; taste?: TasteValue | 0; onRate?: (item: MediaItem, value: TasteValue) => void }) {
+function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste = 0, onRate }: { series: Series; watchlisted?: boolean; onToggleWatchlist?: (series: Series) => void; taste?: TasteScore | 0; onRate?: (item: MediaItem, value: TasteScore | null) => void }) {
   const seasons = series.seasons.filter((item) => item.seasonNumber > 0 && item.episodeCount > 0);
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [showChoices, setShowChoices] = useState(false);
@@ -914,7 +930,7 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste =
           {!nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
           {!nextEpisode ? <button className="primary focusable movie-action" data-page-autofocus onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button> : null}
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
-          <TasteActions item={series} value={taste} onRate={onRate} />
+          <TasteAction item={series} value={taste} onRate={onRate} />
           {nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
           {nextEpisode ? <button className="secondary focusable movie-action" onClick={() => { setContinueFilePath(undefined); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{`Открыть серии ${season} сезона`}</button> : null}
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
@@ -1032,7 +1048,7 @@ export function Home({ catalog, series = [], tasteProfile = {} }: { catalog: Cat
 }
 
 function RecommendationRail({ items }: { items: MediaItem[] }) {
-  return <section className="catalog-section recommendation-rail" aria-labelledby="rail-recommended"><h2 id="rail-recommended">Рекомендуем</h2><p className="rail-hint">На основе ваших отметок «Нравится» и «Не нравится»</p><div className="rail">{items.map((item) => "numberOfSeasons" in item ? <SeriesCard series={item} key={`series-${item.id}`} /> : <MovieCard movie={item} key={`movie-${item.id}`} />)}</div></section>;
+  return <section className="catalog-section recommendation-rail" aria-labelledby="rail-recommended"><h2 id="rail-recommended">Рекомендуем</h2><p className="rail-hint">На основе ваших оценок от 1 до 10</p><div className="rail">{items.map((item) => "numberOfSeasons" in item ? <SeriesCard series={item} key={`series-${item.id}`} /> : <MovieCard movie={item} key={`movie-${item.id}`} />)}</div></section>;
 }
 
 function ContinueWatchingRail({ series }: { series: Series[] }) {
@@ -1184,11 +1200,11 @@ export function App({
   const [watchlist, setWatchlist] = useState<Movie[]>(readWatchlist);
   const [seriesWatchlist, setSeriesWatchlist] = useState<Series[]>(readSeriesWatchlist);
   const [tasteProfile, setTasteProfile] = useState<TasteProfile>(readTasteProfile);
-  const rateMedia = useCallback((item: MediaItem, value: TasteValue) => {
+  const rateMedia = useCallback((item: MediaItem, value: TasteScore | null) => {
     setTasteProfile((current) => {
       const key = mediaKey(item);
       const next = { ...current };
-      if (next[key]?.value === value) delete next[key]; else next[key] = { value, item };
+      if (value === null) delete next[key]; else next[key] = { value, item };
       localStorage.setItem(tasteProfileStorageKey, JSON.stringify(next));
       return next;
     });
