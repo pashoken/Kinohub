@@ -55,6 +55,11 @@ describe("catalog surfaces", () => {
     expect(recommendations).not.toContain(liked);
     expect(recommendations[0]!.genres.some((genre) => liked.genres.includes(genre))).toBe(true);
   });
+  it("keeps a readable fallback when Seerr provides no useful genres", () => {
+    const liked = { ...fixtureCatalog.rails[0]!.movies[0]!, genres: [] };
+    const candidates = fixtureCatalog.rails.flatMap((rail) => rail.movies);
+    expect(buildRecommendations(candidates, { [`movie:${liked.id}`]: { value: 7, item: liked } }).length).toBeGreaterThan(0);
+  });
   it("places recommendations third after popular titles and popular series", () => {
     const liked = fixtureCatalog.rails[0]!.movies[0]!;
     const show = { id: "show-order", title: "Сериал", year: 2024, overview: "", rating: 8, genres: liked.genres, posterUrl: null, backdropUrl: null, mediaStatus: "unknown" as const, numberOfSeasons: 1, seasons: [{ seasonNumber: 1, name: "Сезон 1", episodeCount: 8, posterUrl: null }] };

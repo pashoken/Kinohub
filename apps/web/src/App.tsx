@@ -188,7 +188,7 @@ function TasteAction({ item, value = 0, onRate }: { item: MediaItem; value?: Tas
 export function buildRecommendations(candidates: MediaItem[], profile: TasteProfile, limit = 16): MediaItem[] {
   const unique = [...new Map(candidates.map((item) => [mediaKey(item), item])).values()];
   const preferences = Object.values(profile);
-  const liked = preferences.filter((entry) => entry.value >= 7).map((entry) => entry.item);
+  const liked = preferences.filter((entry) => entry.value >= 6).map((entry) => entry.item);
   if (!liked.length) return [];
   const genreWeights = new Map<string, number>();
   for (const { item, value: preference } of preferences) {
@@ -196,19 +196,19 @@ export function buildRecommendations(candidates: MediaItem[], profile: TasteProf
     for (const genre of item.genres) genreWeights.set(genre.toLocaleLowerCase("ru"), (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0) + signal);
   }
   const averageLikedRating = liked.reduce((sum, item) => sum + item.rating, 0) / liked.length;
-  return unique
+  const ranked = unique
     .filter((item) => profile[mediaKey(item)] === undefined && hasReadableLocalizedTitle(item.title))
     .map((item) => {
       const genreSignals = item.genres.map((genre) => genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0);
       const positiveGenreSignal = genreSignals.filter((signal) => signal > 0).reduce((sum, signal) => sum + signal, 0);
       const negativeGenreSignal = genreSignals.filter((signal) => signal < 0).reduce((sum, signal) => sum + signal, 0);
       const score = positiveGenreSignal * 2 + negativeGenreSignal * 2 + Math.max(0, 2 - Math.abs(item.rating - averageLikedRating)) + item.rating / 25;
-      return { item, score, positiveGenreSignal };
+      return { item, score, positiveGenreSignal, negativeGenreSignal };
     })
-    .filter(({ score, positiveGenreSignal }) => score > 0 && positiveGenreSignal > 0)
-    .sort((left, right) => right.score - left.score || right.item.rating - left.item.rating)
-    .slice(0, limit)
-    .map(({ item }) => item);
+    .sort((left, right) => right.score - left.score || right.item.rating - left.item.rating);
+  const precise = ranked.filter(({ score, positiveGenreSignal }) => score > 0 && positiveGenreSignal > 0);
+  const fallback = ranked.filter(({ item, positiveGenreSignal, negativeGenreSignal }) => positiveGenreSignal === 0 && negativeGenreSignal >= 0 && item.rating > 0);
+  return [...precise, ...fallback].slice(0, limit).map(({ item }) => item);
 }
 
 export function hasReadableLocalizedTitle(title: string): boolean {
