@@ -285,6 +285,11 @@ input:focus-visible {
 .watchlist-action.is-watchlisted .bookmark-icon {
   fill: currentColor;
 }
+.taste-actions { display: flex; gap: 10px; }
+.taste-action { min-height: 52px; padding: 13px 18px; color: var(--muted); font-weight: 700; }
+.taste-action.is-active.like { background: #176b4b; color: #fff; }
+.taste-action.is-active.dislike { background: #853b45; color: #fff; }
+.rail-hint { margin: -14px 0 20px; color: var(--muted); font-size: .9rem; }
 .watchlist-page {
   padding-top: 34px;
 }

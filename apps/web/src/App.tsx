@@ -16,6 +16,16 @@ const watchlistStorageKey = "kinohub-watchlist-v1";
 const seriesWatchlistStorageKey = "kinohub-series-watchlist-v1";
 const watchedEpisodesStorageKey = "kinohub-watched-episodes-v1";
 const seriesPacksStorageKey = "kinohub-series-packs-v1";
+const tasteProfileStorageKey = "kinohub-taste-profile-v1";
+type TasteValue = 1 | -1;
+type MediaItem = Movie | Series;
+type TasteProfile = Record<string, { value: TasteValue; item: MediaItem }>;
+
+function mediaKey(item: MediaItem): string { return `${"numberOfSeasons" in item ? "series" : "movie"}:${item.id}`; }
+function readTasteProfile(): TasteProfile {
+  try { return JSON.parse(localStorage.getItem(tasteProfileStorageKey) ?? "{}") as TasteProfile; }
+  catch { return {}; }
+}
 
 function watchedEpisodeKey(seriesId: string, season: number, episode: number) { return `${seriesId}:S${season}:E${episode}`; }
 function readWatchedEpisodes(): Set<string> {
@@ -151,6 +161,32 @@ function SeriesCard({ series, pageAutoFocus = false }: { series: Series; pageAut
 export function detailHref(kind: "movies" | "series", id: string, source = `${window.location.pathname}${window.location.search}`): string {
   const from = source.startsWith("/") && !source.startsWith("//") ? source : "/";
   return `/${kind}/${encodeURIComponent(id)}?from=${encodeURIComponent(from)}`;
+}
+
+function TasteActions({ item, value = 0, onRate }: { item: MediaItem; value?: TasteValue | 0; onRate?: ((item: MediaItem, value: TasteValue) => void) | undefined }) {
+  return <div className="taste-actions" aria-label="Ваша оценка">
+    <button className={`secondary focusable taste-action ${value === 1 ? "is-active like" : ""}`} aria-pressed={value === 1} onClick={() => onRate?.(item, 1)}><span aria-hidden="true">👍</span> Нравится</button>
+    <button className={`secondary focusable taste-action ${value === -1 ? "is-active dislike" : ""}`} aria-pressed={value === -1} onClick={() => onRate?.(item, -1)}><span aria-hidden="true">👎</span> Не нравится</button>
+  </div>;
+}
+
+export function buildRecommendations(candidates: MediaItem[], profile: TasteProfile, limit = 16): MediaItem[] {
+  const unique = [...new Map(candidates.map((item) => [mediaKey(item), item])).values()];
+  const preferences = Object.values(profile);
+  const liked = preferences.filter((entry) => entry.value === 1).map((entry) => entry.item);
+  if (!liked.length) return [];
+  const genreWeights = new Map<string, number>();
+  for (const { item, value: preference } of preferences) {
+    for (const genre of item.genres) genreWeights.set(genre.toLocaleLowerCase("ru"), (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0) + (preference === 1 ? 3 : -4));
+  }
+  const averageLikedRating = liked.reduce((sum, item) => sum + item.rating, 0) / liked.length;
+  return unique
+    .filter((item) => profile[mediaKey(item)] === undefined)
+    .map((item) => ({ item, score: item.genres.reduce((sum, genre) => sum + (genreWeights.get(genre.toLocaleLowerCase("ru")) ?? 0), 0) + Math.max(0, 3 - Math.abs(item.rating - averageLikedRating)) + item.rating / 20 }))
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => right.score - left.score || right.item.rating - left.item.rating)
+    .slice(0, limit)
+    .map(({ item }) => item);
 }
 
 function ContextBack() {
@@ -752,10 +788,14 @@ export function MovieDetails({
   movie,
   watchlisted = false,
   onToggleWatchlist,
+  taste = 0,
+  onRate,
 }: {
   movie: Movie;
   watchlisted?: boolean;
   onToggleWatchlist?: (movie: Movie) => void;
+  taste?: TasteValue | 0;
+  onRate?: (item: MediaItem, value: TasteValue) => void;
 }) {
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
@@ -799,6 +839,7 @@ export function MovieDetails({
             </svg>
             Смотреть сейчас
           </button>
+          <TasteActions item={movie} value={taste} onRate={onRate} />
           <button
             className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`}
             aria-pressed={watchlisted}
@@ -834,7 +875,7 @@ export function MovieDetails({
   );
 }
 
-function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { series: Series; watchlisted?: boolean; onToggleWatchlist?: (series: Series) => void }) {
+function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste = 0, onRate }: { series: Series; watchlisted?: boolean; onToggleWatchlist?: (series: Series) => void; taste?: TasteValue | 0; onRate?: (item: MediaItem, value: TasteValue) => void }) {
   const seasons = series.seasons.filter((item) => item.seasonNumber > 0 && item.episodeCount > 0);
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [showChoices, setShowChoices] = useState(false);
@@ -873,6 +914,7 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
           <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
           <button className="primary focusable movie-action" {...(!nextEpisode ? { "data-page-autofocus": true } : {})} onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
+          <TasteActions item={series} value={taste} onRate={onRate} />
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
         {savedPack ? <p className="saved-pack">Закреплена раздача: {savedPack.releaseName}</p> : null}
@@ -952,8 +994,9 @@ function Recommendations({ movieId }: { movieId: string }) {
   );
 }
 
-export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Series[] }) {
+export function Home({ catalog, series = [], tasteProfile = {} }: { catalog: Catalog; series?: Series[]; tasteProfile?: TasteProfile }) {
   const continueWatching = readContinueWatching();
+  const recommendations = buildRecommendations([...catalog.rails.flatMap((rail) => rail.movies), ...series], tasteProfile);
   return (
     <>
       <section className="hero" aria-labelledby="welcome-title">
@@ -977,11 +1020,17 @@ export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Seri
           </div>
         </section>
         {rail.id === "popular" && continueWatching.length ? <ContinueWatchingRail series={continueWatching} /> : null}
-        {rail.id === "popular" && series.length ? <SeriesRail series={series} /> : null}
+        {rail.id === "popular" && !continueWatching.length && series.length ? <SeriesRail series={series} /> : null}
+        {rail.id === "popular" && recommendations.length ? <RecommendationRail items={recommendations} /> : null}
+        {rail.id === "popular" && continueWatching.length && series.length ? <SeriesRail series={series} /> : null}
         </Fragment>
       ))}
     </>
   );
+}
+
+function RecommendationRail({ items }: { items: MediaItem[] }) {
+  return <section className="catalog-section recommendation-rail" aria-labelledby="rail-recommended"><h2 id="rail-recommended">Рекомендуем</h2><p className="rail-hint">На основе ваших отметок «Нравится» и «Не нравится»</p><div className="rail">{items.map((item) => "numberOfSeasons" in item ? <SeriesCard series={item} key={`series-${item.id}`} /> : <MovieCard movie={item} key={`movie-${item.id}`} />)}</div></section>;
 }
 
 function ContinueWatchingRail({ series }: { series: Series[] }) {
@@ -1132,6 +1181,16 @@ export function App({
   const [homeSeries, setHomeSeries] = useState<Series[]>([]);
   const [watchlist, setWatchlist] = useState<Movie[]>(readWatchlist);
   const [seriesWatchlist, setSeriesWatchlist] = useState<Series[]>(readSeriesWatchlist);
+  const [tasteProfile, setTasteProfile] = useState<TasteProfile>(readTasteProfile);
+  const rateMedia = useCallback((item: MediaItem, value: TasteValue) => {
+    setTasteProfile((current) => {
+      const key = mediaKey(item);
+      const next = { ...current };
+      if (next[key]?.value === value) delete next[key]; else next[key] = { value, item };
+      localStorage.setItem(tasteProfileStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }, []);
   const toggleWatchlist = useCallback((selected: Movie) => {
     setWatchlist((current) => {
       const next = current.some((item) => item.id === selected.id)
@@ -1240,13 +1299,15 @@ export function App({
       {state === "ready" && path === "/setup" ? <SetupDiagnostics /> : null}
       {state === "ready" && path === "/watchlist" ? <WatchlistPage movies={watchlist} series={seriesWatchlist} /> : null}
       {state === "ready" && path === "/series" ? <SeriesCatalog /> : null}
-      {state === "ready" && path.startsWith("/series/") && routeSeries ? <SeriesDetails series={routeSeries} watchlisted={seriesWatchlist.some((item) => item.id === routeSeries.id)} onToggleWatchlist={toggleSeriesWatchlist} /> : null}
+      {state === "ready" && path.startsWith("/series/") && routeSeries ? <SeriesDetails series={routeSeries} watchlisted={seriesWatchlist.some((item) => item.id === routeSeries.id)} onToggleWatchlist={toggleSeriesWatchlist} taste={tasteProfile[mediaKey(routeSeries)]?.value ?? 0} onRate={rateMedia} /> : null}
       {state === "ready" && path.startsWith("/series/") && !routeSeries ? <section className="empty"><h1>Загружаем сериал…</h1></section> : null}
       {state === "ready" && path.startsWith("/movies/") && activeMovie ? (
         <MovieDetails
           movie={activeMovie}
           watchlisted={watchlist.some((item) => item.id === activeMovie.id)}
           onToggleWatchlist={toggleWatchlist}
+          taste={tasteProfile[mediaKey(activeMovie)]?.value ?? 0}
+          onRate={rateMedia}
         />
       ) : null}
       {state === "ready" && path.startsWith("/movies/") && !activeMovie ? (
@@ -1256,7 +1317,7 @@ export function App({
         </section>
       ) : null}
       {state === "ready" && path === "/" && catalog ? (
-        <Home catalog={catalog} series={homeSeries} />
+        <Home catalog={catalog} series={homeSeries} tasteProfile={tasteProfile} />
       ) : null}
       {state === "ready" && activeRail ? <RailPage rail={activeRail} /> : null}
     </main>

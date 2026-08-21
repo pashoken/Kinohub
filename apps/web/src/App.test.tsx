@@ -12,6 +12,7 @@ import { fixtureCatalog } from "../../../fixtures/catalog.js";
 import {
   App,
   androidPlayerIntent,
+  buildRecommendations,
   externalPlayerUrl,
   detailHref,
   episodeFileMatches,
@@ -40,6 +41,20 @@ afterEach(() => {
 });
 
 describe("catalog surfaces", () => {
+  it("recommends unrated titles with genres preferred by the viewer", () => {
+    const liked = fixtureCatalog.rails[0]!.movies[0]!;
+    const candidates = fixtureCatalog.rails.flatMap((rail) => rail.movies);
+    const recommendations = buildRecommendations(candidates, { [`movie:${liked.id}`]: { value: 1, item: liked } });
+    expect(recommendations.length).toBeGreaterThan(0);
+    expect(recommendations).not.toContain(liked);
+    expect(recommendations[0]!.genres.some((genre) => liked.genres.includes(genre))).toBe(true);
+  });
+  it("places recommendations third after popular titles and popular series", () => {
+    const liked = fixtureCatalog.rails[0]!.movies[0]!;
+    const show = { id: "show-order", title: "Сериал", year: 2024, overview: "", rating: 8, genres: liked.genres, posterUrl: null, backdropUrl: null, mediaStatus: "unknown" as const, numberOfSeasons: 1, seasons: [{ seasonNumber: 1, name: "Сезон 1", episodeCount: 8, posterUrl: null }] };
+    render(<Home catalog={fixtureCatalog} series={[show]} tasteProfile={{ [`movie:${liked.id}`]: { value: 1, item: liked } }} />);
+    expect(screen.getAllByRole("heading", { level: 2 }).slice(0, 3).map((heading) => heading.textContent)).toEqual([fixtureCatalog.rails[0]!.title, "Популярные сериалы", "Рекомендуем"]);
+  });
   it("keeps the source collection in movie and series links", () => {
     expect(detailHref("movies", "42", "/rails/action?page=2")).toBe("/movies/42?from=%2Frails%2Faction%3Fpage%3D2");
     expect(detailHref("series", "7", "https://outside.example")).toBe("/series/7?from=%2F");
@@ -100,6 +115,15 @@ describe("catalog surfaces", () => {
     const savedMovie = screen.getByRole("link", { name: new RegExp(movie.title) });
     expect(savedMovie).toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).toBe(savedMovie));
+  });
+  it("persists a like and immediately shows recommendations on home", async () => {
+    const movie = fixtureCatalog.rails[0]!.movies[0]!;
+    const view = render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
+    fireEvent.click(screen.getByRole("button", { name: "Нравится" }));
+    expect(localStorage.getItem("kinohub-taste-profile-v1")).toContain(`movie:${movie.id}`);
+    view.unmount();
+    render(<App initialCatalog={fixtureCatalog} initialPath="/" />);
+    expect(screen.getByRole("heading", { name: "Рекомендуем" })).toBeInTheDocument();
   });
   it("renders an honest empty Буду смотреть state", () => {
     render(<App initialCatalog={fixtureCatalog} initialPath="/watchlist" />);
