@@ -86,7 +86,7 @@ export function MovieCard({ movie, pageAutoFocus = false }: { movie: Movie; page
   return (
     <a
       className="card focusable"
-      href={`/movies/${movie.id}`}
+      href={detailHref("movies", movie.id)}
       data-focusable="true"
       {...(pageAutoFocus
         ? { "data-page-autofocus": true, "data-page-autofocus-block": "nearest" }
@@ -141,11 +141,22 @@ function Ratings({ movie }: { movie: Pick<Movie, "title" | "year" | "rating"> })
 
 function SeriesCard({ series, pageAutoFocus = false }: { series: Series; pageAutoFocus?: boolean }) {
   return (
-    <a className="card focusable" href={`/series/${series.id}`} data-focusable="true" {...(pageAutoFocus ? { "data-page-autofocus": true } : {})}>
+    <a className="card focusable" href={detailHref("series", series.id)} data-focusable="true" {...(pageAutoFocus ? { "data-page-autofocus": true } : {})}>
       {series.posterUrl ? <img className="poster" src={series.posterUrl} alt={`Постер: ${series.title}`} loading="lazy" /> : <div className="poster poster-fallback" role="img" aria-label={`Нет постера: ${series.title}`}>{series.title[0]}</div>}
       <strong>{series.title}</strong><span>{series.year} · сериал</span><Ratings movie={series} />
     </a>
   );
+}
+
+export function detailHref(kind: "movies" | "series", id: string, source = `${window.location.pathname}${window.location.search}`): string {
+  const from = source.startsWith("/") && !source.startsWith("//") ? source : "/";
+  return `/${kind}/${encodeURIComponent(id)}?from=${encodeURIComponent(from)}`;
+}
+
+function ContextBack() {
+  const rawFrom = new URLSearchParams(window.location.search).get("from");
+  const fallback = rawFrom?.startsWith("/") && !rawFrom.startsWith("//") ? rawFrom : "/";
+  return <a className="back focusable" href={fallback} onClick={(event) => { if (!rawFrom || window.history.length <= 1) return; event.preventDefault(); window.history.back(); }}>← Назад</a>;
 }
 
 function ShowMoreCard({ railId, title }: { railId: string; title: string }) {
@@ -759,9 +770,7 @@ export function MovieDetails({
       className={`details ${movie.backdropUrl ? "" : "missing-backdrop"}`}
       style={backdropStyle}
     >
-      <a className="back focusable" href="/">
-        ← На главную
-      </a>
+      <ContextBack />
       <div className="detail-content">
         <p className="eyebrow detail-status">{statusCopy[movie.mediaStatus]}</p>
         <h1>{movie.title}</h1>
@@ -853,7 +862,7 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
   }, [savedPack, series]);
   return (
     <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
-      <a className="back focusable" href="/series">← К сериалам</a>
+      <ContextBack />
       <div className="detail-content">
         <p className="eyebrow detail-status">СЕРИАЛ · {series.numberOfSeasons} сез.</p>
         <h1>{series.title}</h1>

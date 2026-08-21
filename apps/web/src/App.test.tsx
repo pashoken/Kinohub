@@ -13,6 +13,7 @@ import {
   App,
   androidPlayerIntent,
   externalPlayerUrl,
+  detailHref,
   episodeFileMatches,
   episodeFileInfo,
   Home,
@@ -39,6 +40,10 @@ afterEach(() => {
 });
 
 describe("catalog surfaces", () => {
+  it("keeps the source collection in movie and series links", () => {
+    expect(detailHref("movies", "42", "/rails/action?page=2")).toBe("/movies/42?from=%2Frails%2Faction%3Fpage%3D2");
+    expect(detailHref("series", "7", "https://outside.example")).toBe("/series/7?from=%2F");
+  });
   it("builds Продолжить просмотр from started but unfinished series", () => {
     const series = { id: "show-1", title: "Тестовый сериал", year: 2024, overview: "", rating: 8, genres: [], posterUrl: null, backdropUrl: null, mediaStatus: "unknown", numberOfSeasons: 1, seasons: [{ seasonNumber: 1, name: "Сезон 1", episodeCount: 3, posterUrl: null }] };
     localStorage.setItem("kinohub-series-packs-v1", JSON.stringify({ "show-1": { releaseName: "Show S01", files: [], series } }));
@@ -70,6 +75,7 @@ describe("catalog surfaces", () => {
     expect(screen.getByText("Фантастика · Приключения")).toBeInTheDocument();
     expect(screen.getByText(movie.overview)).toBeInTheDocument();
     expect(screen.getByText("Не добавлен")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "← Назад" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("button", { name: "Смотреть сейчас" })).toHaveClass("primary");
     expect(screen.getByRole("button", { name: "Скачать 1080p" })).toHaveClass("download-action");
     expect(screen.getByRole("button", { name: "Буду смотреть" })).toHaveClass("watchlist-action");
