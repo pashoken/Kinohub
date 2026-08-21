@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Catalog, Movie, Series } from "@kinohub/contracts";
 import "./styles.css";
@@ -23,7 +24,7 @@ function readWatchedEpisodes(): Set<string> {
 }
 function saveWatchedEpisodes(value: Set<string>) { localStorage.setItem(watchedEpisodesStorageKey, JSON.stringify([...value])); }
 
-type SavedSeriesPack = { releaseName: string; files: PlaybackFile[] };
+type SavedSeriesPack = { releaseName: string; files: PlaybackFile[]; releaseInfo?: TorrentChoice | undefined; series?: Series };
 function readSeriesPacks(): Record<string, SavedSeriesPack> {
   try { return JSON.parse(localStorage.getItem(seriesPacksStorageKey) ?? "{}") as Record<string, SavedSeriesPack>; }
   catch { return {}; }
@@ -33,6 +34,15 @@ function saveSeriesPack(seriesId: string, pack: SavedSeriesPack) {
 }
 function removeSeriesPack(seriesId: string) {
   const packs = readSeriesPacks(); delete packs[seriesId]; localStorage.setItem(seriesPacksStorageKey, JSON.stringify(packs));
+}
+export function readContinueWatching(): Series[] {
+  const watched = readWatchedEpisodes();
+  return Object.entries(readSeriesPacks()).flatMap(([seriesId, pack]) => {
+    if (!pack.series) return [];
+    const watchedCount = [...watched].filter((key) => key.startsWith(`${seriesId}:`)).length;
+    const totalEpisodes = pack.series.seasons.filter((season) => season.seasonNumber > 0).reduce((sum, season) => sum + season.episodeCount, 0);
+    return watchedCount > 0 && watchedCount < totalEpisodes ? [pack.series] : [];
+  });
 }
 
 function readWatchlist(): Movie[] {
@@ -165,6 +175,8 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
   const [pending, setPending] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
   const sequenceRef = useRef(0);
+  const immediateSearchRef = useRef(false);
+  const [submitTick, setSubmitTick] = useState(0);
 
   useEffect(() => {
     if (initialResults !== undefined) return;
@@ -179,6 +191,8 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
       return;
     }
     setPending(true);
+    const delay = immediateSearchRef.current ? 0 : 350;
+    immediateSearchRef.current = false;
     const timer = window.setTimeout(() => {
       requestRef.current?.abort();
       const sequence = ++sequenceRef.current;
@@ -209,24 +223,28 @@ export function Search({ initialResults }: { initialResults?: Movie[] }) {
             setPending(false);
           }
         });
-    }, 350);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [query, initialResults]);
+  }, [query, initialResults, submitTick]);
 
   return (
     <section className="search-panel" aria-labelledby="search-title">
       <p className="eyebrow">ПОИСК</p>
       <h1 id="search-title">Найдите фильм или сериал</h1>
-      <label className="search-field">
+      <form className="search-field" onSubmit={(event) => { event.preventDefault(); immediateSearchRef.current = true; setSubmitTick((value) => value + 1); }}>
+      <label>
         <span className="sr-only">Название фильма</span>
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Например, Космический рубеж"
           autoFocus
+          enterKeyHint="search"
           data-page-autofocus
         />
       </label>
+      <button className="primary focusable" type="submit">Найти</button>
+      </form>
       {pending ? <p role="status">Ищем…</p> : null}
       {searched && !pending && results.length === 0 && seriesResults.length === 0 ? (
         <div className="empty">
@@ -525,6 +543,7 @@ export function PlaybackPanel({
   choiceId,
   seriesContext,
   onResolved,
+  releaseInfo,
   initialResult,
   initialError,
   onClose,
@@ -532,6 +551,7 @@ export function PlaybackPanel({
   choiceId?: string;
   seriesContext?: { seriesId: string; season: number };
   onResolved?: (result: PlaybackResult) => void;
+  releaseInfo?: TorrentChoice | undefined;
   initialResult?: PlaybackResult;
   initialError?: string;
   onClose: () => void;
@@ -656,6 +676,7 @@ export function PlaybackPanel({
             >
               <span>{info ? `${info.episode} серия` : file.path}{isWatched ? " · ✓ Просмотрено" : ""}</span>
               {info ? <small>{file.path}</small> : null}
+              <span className="file-meta">{fileMediaSummary(file.path, releaseInfo)}</span>
               <span>{(file.length / 1024 ** 3).toFixed(1)} ГБ</span>
             </button>
           );})}
@@ -665,6 +686,7 @@ export function PlaybackPanel({
         <div className="player-ready">
           <h3>Готово к просмотру</h3>
           <p>{active.path}</p>
+          <div className="file-badges" aria-label="Информация о файле">{fileMediaHints(active.path, releaseInfo).map((hint) => <span key={hint}>{hint}</span>)}</div>
           <a
             className="primary link-button focusable"
             href={externalPlayerUrl(active.streamUrl, "video/*")}
@@ -674,14 +696,6 @@ export function PlaybackPanel({
             Выбрать плеер
           </a>
           {seriesContext ? <button className="secondary focusable" onClick={() => setSelected(undefined)}>← К списку серий</button> : null}
-          <a
-            className="secondary link-button focusable"
-            href={active.streamUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Открыть поток в новой вкладке
-          </a>
           {active.playlistUrl ? (
             <a
               className="secondary link-button focusable"
@@ -690,18 +704,19 @@ export function PlaybackPanel({
               Открыть M3U в VLC / Kodi
             </a>
           ) : null}
-          <button
-            className="secondary focusable"
-            onClick={() =>
-              void navigator.clipboard?.writeText(active.streamUrl)
-            }
-          >
-            Копировать ссылку
-          </button>
         </div>
       ) : null}
     </section>
   );
+}
+
+function fileMediaHints(path: string, release?: TorrentChoice): string[] {
+  const fromName = [path.match(/\b(?:2160p|1080p|720p|4K)\b/i)?.[0], path.match(/\b(?:HEVC|H\.265|x265|AVC|H\.264|x264)\b/i)?.[0]].filter((value): value is string => Boolean(value));
+  const usefulFlags = release?.flags.filter((flag) => /^(?:2160p|1080p|720p|H264|H265|RU|EN|ENG AUDIO|RU SUB|EN SUB|SDR|HDR|DV)$/i.test(flag)) ?? [];
+  return [...new Set([...fromName, ...usefulFlags])];
+}
+function fileMediaSummary(path: string, release?: TorrentChoice): string {
+  return fileMediaHints(path, release).join(" · ") || "Параметры дорожек не указаны в названии раздачи";
 }
 
 export function episodeFileMatches(path: string, season: number, episode: number): boolean {
@@ -727,6 +742,7 @@ export function MovieDetails({
 }) {
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
+  const [selectedRelease, setSelectedRelease] = useState<TorrentChoice>();
   const backdropStyle = movie.backdropUrl
     ? {
         backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${movie.backdropUrl})`,
@@ -784,8 +800,9 @@ export function MovieDetails({
         <TorrentChoiceDrawer
           movieId={movie.id}
           onClose={() => setShowChoices(false)}
-          onSelect={(id) => {
+          onSelect={(id, choice) => {
             setShowChoices(false);
+            setSelectedRelease(choice);
             setChoiceId(id);
           }}
         />
@@ -793,6 +810,7 @@ export function MovieDetails({
       {choiceId ? (
         <PlaybackPanel
           choiceId={choiceId}
+          releaseInfo={selectedRelease}
           onClose={() => setChoiceId(undefined)}
         />
       ) : null}
@@ -807,8 +825,13 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
   const [showChoices, setShowChoices] = useState(false);
   const [choiceId, setChoiceId] = useState<string>();
   const [releaseName, setReleaseName] = useState("");
+  const [selectedRelease, setSelectedRelease] = useState<TorrentChoice>();
   const [savedPack, setSavedPack] = useState<SavedSeriesPack | undefined>(() => readSeriesPacks()[series.id]);
   const [useSavedPack, setUseSavedPack] = useState(false);
+  useEffect(() => {
+    if (!savedPack || savedPack.series) return;
+    const enriched = { ...savedPack, series }; saveSeriesPack(series.id, enriched); setSavedPack(enriched);
+  }, [savedPack, series]);
   return (
     <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
       <a className="back focusable" href="/series">← К сериалам</a>
@@ -825,9 +848,9 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist }: { ser
         </div>
         {savedPack ? <p className="saved-pack">Закреплена раздача: {savedPack.releaseName}</p> : null}
       </div>
-      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id, choice) => { setShowChoices(false); setReleaseName(choice.releaseName); setChoiceId(id); }} /> : null}
-      {choiceId ? <PlaybackPanel choiceId={choiceId} seriesContext={{ seriesId: series.id, season }} onResolved={(result) => { const pack = { releaseName, files: result.files }; saveSeriesPack(series.id, pack); setSavedPack(pack); }} onClose={() => setChoiceId(undefined)} /> : null}
-      {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} seriesContext={{ seriesId: series.id, season }} onClose={() => setUseSavedPack(false)} /> : null}
+      {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id, choice) => { setShowChoices(false); setReleaseName(choice.releaseName); setSelectedRelease(choice); setChoiceId(id); }} /> : null}
+      {choiceId ? <PlaybackPanel choiceId={choiceId} releaseInfo={selectedRelease} seriesContext={{ seriesId: series.id, season }} onResolved={(result) => { const pack = { releaseName, files: result.files, releaseInfo: selectedRelease, series }; saveSeriesPack(series.id, pack); setSavedPack(pack); }} onClose={() => setChoiceId(undefined)} /> : null}
+      {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} releaseInfo={savedPack.releaseInfo} seriesContext={{ seriesId: series.id, season }} onClose={() => setUseSavedPack(false)} /> : null}
     </article>
   );
 }
@@ -884,6 +907,7 @@ function Recommendations({ movieId }: { movieId: string }) {
 }
 
 export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Series[] }) {
+  const continueWatching = readContinueWatching();
   return (
     <>
       <section className="hero" aria-labelledby="welcome-title">
@@ -906,11 +930,16 @@ export function Home({ catalog, series = [] }: { catalog: Catalog; series?: Seri
             <ShowMoreCard railId={rail.id} title={rail.title} />
           </div>
         </section>
+        {rail.id === "popular" && continueWatching.length ? <ContinueWatchingRail series={continueWatching} /> : null}
         {rail.id === "popular" && series.length ? <SeriesRail series={series} /> : null}
         </Fragment>
       ))}
     </>
   );
+}
+
+function ContinueWatchingRail({ series }: { series: Series[] }) {
+  return <section className="catalog-section continue-watching" aria-labelledby="rail-continue-watching"><h2 id="rail-continue-watching">Продолжить просмотр</h2><div className="rail">{series.map((item) => <SeriesCard series={item} key={item.id} />)}</div></section>;
 }
 
 function SeriesRail({ series }: { series: Series[] }) {

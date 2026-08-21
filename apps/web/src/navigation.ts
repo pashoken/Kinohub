@@ -28,6 +28,15 @@ function visible(element: HTMLElement) {
 
 export function useSpatialNavigation() {
   useEffect(() => {
+    const handleBack = (event: Event): boolean => {
+      const dialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1);
+      const close = dialog?.querySelector<HTMLElement>("[data-dialog-close]");
+      if (close) { event.preventDefault(); close.click(); return true; }
+      if (document.activeElement instanceof HTMLInputElement) {
+        event.preventDefault(); document.activeElement.blur(); return true;
+      }
+      return false;
+    };
     const handler = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" ||
@@ -35,15 +44,7 @@ export function useSpatialNavigation() {
         (event.key === "Backspace" &&
           !(event.target instanceof HTMLInputElement))
       ) {
-        const dialog = [
-          ...document.querySelectorAll<HTMLElement>('[role="dialog"]'),
-        ].at(-1);
-        const close = dialog?.querySelector<HTMLElement>("[data-dialog-close]");
-        if (close) {
-          event.preventDefault();
-          close.click();
-          return;
-        }
+        if (handleBack(event)) return;
       }
       if (
         !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)
@@ -152,8 +153,10 @@ export function useSpatialNavigation() {
         });
       }
     };
+    const nativeBack = (event: Event) => { handleBack(event); };
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    window.addEventListener("kinohub-back", nativeBack);
+    return () => { document.removeEventListener("keydown", handler); window.removeEventListener("kinohub-back", nativeBack); };
   }, []);
 }
 

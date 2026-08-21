@@ -403,6 +403,9 @@ input:focus-visible {
 .file-list .choice {
   grid-template-columns: 1fr auto;
 }
+.file-list .choice small,
+.file-list .choice .file-meta { grid-column: 1 / -1; color: #aeb7c9; }
+.file-meta { font-size: 13px; }
 .player-ready {
   grid-template-columns: repeat(2, minmax(0, max-content));
   align-items: center;
@@ -411,6 +414,8 @@ input:focus-visible {
 .player-ready p {
   grid-column: 1 / -1;
 }
+.file-badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.file-badges span { padding: 6px 10px; border-radius: 999px; background: #1d2a43; color: #cbd7ef; font-size: 13px; font-weight: 700; }
 .link-button {
   display: inline-flex;
   align-items: center;
@@ -454,6 +459,8 @@ button {
   color: #fff;
   font-size: 22px;
 }
+.search-field { display: flex; align-items: center; gap: 14px; }
+.search-field label { flex: 1; }
 .result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

@@ -69,8 +69,14 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        webView.evaluateJavascript(
+            "(function(){var e=new Event('kinohub-back',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;})()",
+            handled -> {
+                if ("true".equals(handled)) return;
+                if (webView.canGoBack()) webView.goBack();
+                else finish();
+            }
+        );
     }
 
     @Override

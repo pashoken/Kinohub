@@ -20,6 +20,7 @@ import {
   MoviePoster,
   PlaybackPanel,
   RequestAction,
+  readContinueWatching,
   Search,
   TorrentChoiceDrawer,
 } from "./App.js";
@@ -38,6 +39,12 @@ afterEach(() => {
 });
 
 describe("catalog surfaces", () => {
+  it("builds Продолжить просмотр from started but unfinished series", () => {
+    const series = { id: "show-1", title: "Тестовый сериал", year: 2024, overview: "", rating: 8, genres: [], posterUrl: null, backdropUrl: null, mediaStatus: "unknown", numberOfSeasons: 1, seasons: [{ seasonNumber: 1, name: "Сезон 1", episodeCount: 3, posterUrl: null }] };
+    localStorage.setItem("kinohub-series-packs-v1", JSON.stringify({ "show-1": { releaseName: "Show S01", files: [], series } }));
+    localStorage.setItem("kinohub-watched-episodes-v1", JSON.stringify(["show-1:S1:E1"]));
+    expect(readContinueWatching().map((item) => item.title)).toEqual(["Тестовый сериал"]);
+  });
   it("autofocuses the first movie on the home page", async () => {
     render(<App initialCatalog={fixtureCatalog} initialPath="/" />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("link", { name: /Космический рубеж/ })));
@@ -157,6 +164,15 @@ describe("debounced cancellable search", () => {
       expect.stringContaining(encodeURIComponent("Космический")),
       expect.anything(),
     );
+  });
+  it("submits immediately from the Android Search/Go action", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ movies: [], series: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Search />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Матрица" } });
+    fireEvent.submit(screen.getByRole("textbox").closest("form")!);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("Матрица")), expect.anything());
   });
   it("shows an explicit no-results state", () => {
     render(<Search initialResults={[]} />);
@@ -392,15 +408,17 @@ describe("playback panel", () => {
       screen
         .getAllByRole("button", { name: /Фильм часть/ })
         .map((button) => button.textContent),
-    ).toEqual(["Фильм часть 2.mkv2.0 ГБ", "Фильм часть 10.mkv3.0 ГБ"]);
+    ).toEqual([
+      "Фильм часть 2.mkvПараметры дорожек не указаны в названии раздачи2.0 ГБ",
+      "Фильм часть 10.mkvПараметры дорожек не указаны в названии раздачи3.0 ГБ",
+    ]);
     fireEvent.click(screen.getByRole("button", { name: /Фильм часть 2/ }));
     expect(screen.getByRole("link", { name: "Выбрать плеер" })).toHaveAttribute(
       "href",
       expect.stringMatching(/^http:\/\/torrserver:8090\/stream/),
     );
-    expect(
-      screen.getByRole("link", { name: "Открыть поток в новой вкладке" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Открыть поток в новой вкладке" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Копировать ссылку" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Открыть M3U в VLC / Kodi" })).toHaveAttribute("href", expect.stringContaining("/playlist"));
   });
   it("marks a launched series episode as watched", () => {
