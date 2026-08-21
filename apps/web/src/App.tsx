@@ -823,12 +823,6 @@ export function MovieDetails({
           {movie.overview || "Описание пока недоступно."}
         </p>
         <div className="actions">
-          <RequestAction
-            movieId={movie.id}
-            initialState={
-              movie.mediaStatus === "unknown" ? "idle" : movie.mediaStatus
-            }
-          />
           <button
             className="primary focusable movie-action"
             data-page-autofocus
@@ -839,7 +833,6 @@ export function MovieDetails({
             </svg>
             Смотреть сейчас
           </button>
-          <TasteActions item={movie} value={taste} onRate={onRate} />
           <button
             className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`}
             aria-pressed={watchlisted}
@@ -850,6 +843,13 @@ export function MovieDetails({
             </svg>
             {watchlisted ? "В списке" : "Буду смотреть"}
           </button>
+          <TasteActions item={movie} value={taste} onRate={onRate} />
+          <RequestAction
+            movieId={movie.id}
+            initialState={
+              movie.mediaStatus === "unknown" ? "idle" : movie.mediaStatus
+            }
+          />
         </div>
       </div>
       {showChoices ? (
@@ -911,10 +911,12 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste =
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
         <div className="episode-picker" aria-label="Выбор серии">
           {nextEpisode ? <button className="primary focusable movie-action continue-action" data-page-autofocus onClick={() => { setSeason(nextEpisode.info.season); setContinueFilePath(nextEpisode.file.path); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Продолжить просмотр · {nextEpisode.info.season} сезон, {nextEpisode.info.episode} серия</button> : null}
-          <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label>
-          <button className="primary focusable movie-action" {...(!nextEpisode ? { "data-page-autofocus": true } : {})} onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button>
+          {!nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
+          {!nextEpisode ? <button className="primary focusable movie-action" data-page-autofocus onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button> : null}
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
           <TasteActions item={series} value={taste} onRate={onRate} />
+          {nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
+          {nextEpisode ? <button className="secondary focusable movie-action" onClick={() => { setContinueFilePath(undefined); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{`Открыть серии ${season} сезона`}</button> : null}
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
         {savedPack ? <p className="saved-pack">Закреплена раздача: {savedPack.releaseName}</p> : null}
