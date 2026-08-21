@@ -11,7 +11,7 @@ import { requestJson, requestText } from "./http.js";
 import { JackettClient, parseTorznab } from "./jackett.js";
 import { normalizeSeerrMovie, normalizeSeerrSeries, SeerrClient } from "./seerr.js";
 import { TorrServerClient } from "./torrserver.js";
-import { KinopoiskClient } from "./kinopoisk.js";
+import { KinopoiskClient, PoiskKinoClient } from "./kinopoisk.js";
 
 describe("Kinopoisk rating adapter", () => {
   it("matches an exact title and year and keeps the key in a header", async () => {
@@ -24,6 +24,19 @@ describe("Kinopoisk rating adapter", () => {
       ] }));
     });
     const client = new KinopoiskClient(testKey, { fetchImpl: fetchImpl as typeof fetch });
+    await expect(client.rating("Матрица", 1999)).resolves.toEqual({ id: 301, rating: 8.5 });
+    await expect(client.rating("Матрица", 1999)).resolves.toEqual({ id: 301, rating: 8.5 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PoiskKino fallback adapter", () => {
+  it("uses X-API-KEY and reads the Kinopoisk rating from an exact title and year", async () => {
+    const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("X-API-KEY")).toBe("fallback-test-token");
+      return new Response(JSON.stringify({ docs: [{ id: 301, name: "Матрица", alternativeName: "The Matrix", year: 1999, rating: { kp: 8.5 } }] }));
+    });
+    const client = new PoiskKinoClient("fallback-test-token", { fetchImpl: fetchImpl as typeof fetch });
     await expect(client.rating("Матрица", 1999)).resolves.toEqual({ id: 301, rating: 8.5 });
     await expect(client.rating("Матрица", 1999)).resolves.toEqual({ id: 301, rating: 8.5 });
     expect(fetchImpl).toHaveBeenCalledTimes(1);

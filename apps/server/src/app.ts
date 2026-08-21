@@ -10,7 +10,7 @@ import type { AppConfig } from "./config.js";
 import { integrationDiagnostics } from "./integrations/health.js";
 import { JackettClient } from "./integrations/jackett.js";
 import { SeerrClient } from "./integrations/seerr.js";
-import { KinopoiskClient } from "./integrations/kinopoisk.js";
+import { KinopoiskClient, PoiskKinoClient } from "./integrations/kinopoisk.js";
 import { TorrServerClient } from "./integrations/torrserver.js";
 import {
   mockRequestAdapter,
@@ -36,6 +36,7 @@ export function buildApp(config: AppConfig) {
     ? new SeerrClient(new URL(config.SEERR_URL), config.SEERR_API_KEY)
     : undefined;
   const kinopoisk = config.KINOPOISK_API_KEY ? new KinopoiskClient(config.KINOPOISK_API_KEY) : undefined;
+  const poiskKino = config.POISKKINO_API_KEY ? new PoiskKinoClient(config.POISKKINO_API_KEY) : undefined;
   const jackett = config.APP_MODE === "live" && config.JACKETT_URL && config.JACKETT_API_KEY
     ? new JackettClient(new URL(config.JACKETT_URL), config.JACKETT_API_KEY, { timeoutMs: 30_000, retries: 0 }, new URL(config.PUBLIC_JACKETT_URL ?? config.JACKETT_URL))
     : undefined;
@@ -171,12 +172,17 @@ export function buildApp(config: AppConfig) {
       year: z.coerce.number().int().min(1888).max(2200),
     }).safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ code: "INVALID_MOVIE", message: "Некорректные данные фильма" });
-    if (!kinopoisk) return { rating: null, id: null };
+    if (!kinopoisk && !poiskKino) return { rating: null, id: null };
     try {
-      const result = await kinopoisk.rating(parsed.data.title, parsed.data.year);
+      const result = kinopoisk
+        ? await kinopoisk.rating(parsed.data.title, parsed.data.year)
+        : await poiskKino!.rating(parsed.data.title, parsed.data.year);
       return { rating: result?.rating ?? null, id: result?.id ?? null };
     } catch {
-      return { rating: null, id: null };
+      try {
+        const result = poiskKino ? await poiskKino.rating(parsed.data.title, parsed.data.year) : null;
+        return { rating: result?.rating ?? null, id: result?.id ?? null };
+      } catch { return { rating: null, id: null }; }
     }
   });
   app.get("/api/health/integrations", async () => ({

@@ -11,6 +11,7 @@ const envSchema = z.object({
   SEERR_SERVER_ID: z.coerce.number().int().positive().default(1),
   SEERR_PROFILE_ID: z.coerce.number().int().positive().default(1),
   KINOPOISK_API_KEY: z.string().uuid().optional(),
+  POISKKINO_API_KEY: z.string().min(10).optional(),
   JACKETT_URL: z.string().url().optional(),
   PUBLIC_JACKETT_URL: z.string().url().optional(),
   JACKETT_API_KEY: z.string().min(1).optional(),
