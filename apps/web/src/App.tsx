@@ -185,6 +185,26 @@ function TasteAction({ item, value = 0, onRate }: { item: MediaItem; value?: Tas
   </>;
 }
 
+export function SeasonPicker({ seasons, value, onChange }: { seasons: Series["seasons"]; value: number; onChange: (season: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(open, dialogRef);
+  useEffect(() => {
+    if (!open) return;
+    queueMicrotask(() => focusAndReveal(dialogRef.current?.querySelector<HTMLElement>(`[data-season="${value}"]`) ?? null));
+  }, [open, value]);
+  return <>
+    <button className="secondary focusable season-picker-trigger" aria-haspopup="dialog" onClick={() => setOpen(true)}>Сезон {value} <span aria-hidden="true">▾</span></button>
+    {open ? <section ref={dialogRef} className="season-dialog" role="dialog" aria-modal="true" aria-labelledby="season-dialog-title">
+      <div className="drawer-head"><div><p className="eyebrow">ВЫБОР СЕЗОНА</p><h2 id="season-dialog-title">Какой сезон открыть?</h2></div><button className="secondary focusable" data-dialog-close onClick={() => setOpen(false)}>Закрыть</button></div>
+      <div className="season-grid">{seasons.map((item) => {
+        const select = () => { onChange(item.seasonNumber); setOpen(false); };
+        return <button key={item.seasonNumber} data-season={item.seasonNumber} className={`focusable season-option ${value === item.seasonNumber ? "is-selected" : ""}`} aria-pressed={value === item.seasonNumber} onClick={select} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); select(); } }}>Сезон {item.seasonNumber}<small>{item.episodeCount} серий</small></button>;
+      })}</div>
+    </section> : null}
+  </>;
+}
+
 export function buildRecommendations(candidates: MediaItem[], profile: TasteProfile, limit = 16): MediaItem[] {
   const unique = [...new Map(candidates.map((item) => [mediaKey(item), item])).values()];
   const preferences = Object.values(profile);
@@ -940,11 +960,11 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste =
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
         <div className="episode-picker" aria-label="Выбор серии">
           {nextEpisode ? <button className="primary focusable movie-action continue-action" data-page-autofocus onClick={() => { setSeason(nextEpisode.info.season); setContinueFilePath(nextEpisode.file.path); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Продолжить просмотр · {nextEpisode.info.season} сезон, {nextEpisode.info.episode} серия</button> : null}
-          {!nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
+          {!nextEpisode ? <SeasonPicker seasons={seasons} value={season} onChange={setSeason} /> : null}
           {!nextEpisode ? <button className="primary focusable movie-action" data-page-autofocus onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button> : null}
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
           <TasteAction item={series} value={taste} onRate={onRate} />
-          {nextEpisode ? <label>Сезон<select className="focusable" value={season} onChange={(event) => setSeason(Number(event.target.value))}>{seasons.map((item) => <option value={item.seasonNumber} key={item.seasonNumber}>{item.seasonNumber}</option>)}</select></label> : null}
+          {nextEpisode ? <SeasonPicker seasons={seasons} value={season} onChange={setSeason} /> : null}
           {nextEpisode ? <button className="secondary focusable movie-action" onClick={() => { setContinueFilePath(undefined); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{`Открыть серии ${season} сезона`}</button> : null}
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>

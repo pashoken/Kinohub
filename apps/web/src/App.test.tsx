@@ -25,6 +25,7 @@ import {
   RequestAction,
   readContinueWatching,
   Search,
+  SeasonPicker,
   TorrentChoiceDrawer,
 } from "./App.js";
 
@@ -34,6 +35,23 @@ describe("series episode matching", () => {
   });
   it("does not select a different episode", () => expect(episodeFileMatches("Reacher.S01E04.mkv", 1, 3)).toBe(false));
   it("extracts season and episode from a torrent filename", () => expect(episodeFileInfo("Game.of.Thrones.S02E07.mkv")).toEqual({ season: 2, episode: 7 }));
+});
+
+describe("TV season picker", () => {
+  const seasons = [
+    { seasonNumber: 1, name: "Сезон 1", episodeCount: 8, posterUrl: null },
+    { seasonNumber: 2, name: "Сезон 2", episodeCount: 10, posterUrl: null },
+  ];
+  it("opens a focusable season grid and selects with one activation", async () => {
+    const onChange = vi.fn();
+    render(<SeasonPicker seasons={seasons} value={1} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /Сезон 1/ }));
+    expect(screen.getByRole("dialog", { name: "Какой сезон открыть?" })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /Сезон 1.*8 серий/ })));
+    fireEvent.keyDown(screen.getByRole("button", { name: /Сезон 2.*10 серий/ }), { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 });
 
 afterEach(() => {
