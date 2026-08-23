@@ -27,6 +27,14 @@ KinoHub — домашний каталог фильмов и сериалов �
 
 Если сервер находится в интернете, не открывайте административные панели и TorrServer всему интернету. Эта инструкция рассчитана прежде всего на доверенную домашнюю сеть.
 
+### Нужен ли VPN
+
+В некоторых сетях отдельные внешние ресурсы, используемые Seerr, Jackett или Docker, могут быть недоступны. В таком случае VPN должен работать на роутере или сервере с Docker — VPN только на телевизоре обычно не поможет контейнерам.
+
+Важно сохранить прямой доступ внутри домашней сети к портам `4100` и `8090`. Не указывайте VPN-адрес в `PUBLIC_APP_ORIGIN` и `PUBLIC_TORRSERVER_URL`: там по-прежнему нужен обычный LAN IP сервера.
+
+Варианты подключения, проверки и устранение типичных проблем подробно описаны в [инструкции по VPN и сети](docs/vpn.md).
+
 ## Самый простой вариант: установить всё с нуля
 
 Этот путь подходит, если Seerr, Jellyfin, Jackett и TorrServer ещё не установлены.
@@ -267,6 +275,8 @@ Windows PowerShell:
 docker compose -f compose.full.yaml --profile full logs --tail=100 kinohub
 ```
 
+Если тест индексатора не проходит только без VPN, настройте VPN на сервере или роутере по [отдельной инструкции](docs/vpn.md).
+
 ### Видео не запускается
 
 - откройте `http://IP_СЕРВЕРА:8090` с телевизора;
@@ -310,7 +320,7 @@ docker compose -f compose.full.yaml --profile full restart
 docker compose -f compose.full.yaml --profile full down
 ```
 
-Подробное описание переменных: [docs/configuration.md](docs/configuration.md). Инструкция для Android TV: [docs/android-tv.md](docs/android-tv.md). Правила сортировки раздач: [docs/torrent-ranking.md](docs/torrent-ranking.md).
+Подробное описание переменных: [docs/configuration.md](docs/configuration.md). Инструкция для Android TV: [docs/android-tv.md](docs/android-tv.md). VPN и сеть: [docs/vpn.md](docs/vpn.md). Правила сортировки раздач: [docs/torrent-ranking.md](docs/torrent-ranking.md).
 
 ## Для разработчиков
 
