@@ -3,17 +3,30 @@ import { useEffect, type RefObject } from "react";
 const focusSelector =
   'a[href]:not([tabindex="-1"]), button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function focusAndReveal(element: HTMLElement | null, block: ScrollLogicalPosition = "center") {
+export function focusAndReveal(
+  element: HTMLElement | null,
+  block: ScrollLogicalPosition = "center",
+  inline: ScrollLogicalPosition = "center",
+) {
   if (!element) return;
   element.focus({ preventScroll: true });
   if (typeof element.scrollIntoView !== "function") return;
   element.scrollIntoView({
     block,
-    inline: "nearest",
+    inline,
     behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
       ? "auto"
       : "smooth",
   });
+}
+
+function focusNavigationTarget(element: HTMLElement) {
+  const isPageChrome = Boolean(element.closest("header, nav")) || element.matches(".back");
+  focusAndReveal(
+    element,
+    isPageChrome ? "nearest" : "center",
+    isPageChrome ? "nearest" : "center",
+  );
 }
 function visible(element: HTMLElement) {
   const style = getComputedStyle(element);
@@ -121,7 +134,7 @@ export function useSpatialNavigation() {
         const target = gridNavigationTarget(current, scoped, direction);
         if (target) {
           event.preventDefault();
-          focusAndReveal(target, "nearest");
+          focusNavigationTarget(target);
           return;
         }
         if (direction === "ArrowLeft" || direction === "ArrowRight") {
@@ -149,7 +162,7 @@ export function useSpatialNavigation() {
               })[0];
             if (target) {
               event.preventDefault();
-              focusAndReveal(target, "nearest");
+              focusNavigationTarget(target);
               return;
             }
           }
@@ -184,21 +197,13 @@ export function useSpatialNavigation() {
       const localRanked = rankDirectional(contentCandidates);
       if (localRanked[0]) {
         event.preventDefault();
-        focusAndReveal(localRanked[0].candidate, "nearest");
+        focusNavigationTarget(localRanked[0].candidate);
         return;
       }
       const ranked = rankDirectional(candidates);
       if (ranked[0]) {
         event.preventDefault();
-        ranked[0].candidate.focus({ preventScroll: true });
-        ranked[0].candidate.scrollIntoView({
-          block: "nearest",
-          inline: "nearest",
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-            .matches
-            ? "auto"
-            : "smooth",
-        });
+        focusNavigationTarget(ranked[0].candidate);
       }
     };
     const nativeBack = (event: Event) => { handleBack(event); };
@@ -219,6 +224,7 @@ export function usePageFocus(key: string, active = true) {
       focusAndReveal(
         target,
         target?.dataset.pageAutofocusBlock === "nearest" ? "nearest" : "center",
+        "nearest",
       );
     });
   }, [key, active]);

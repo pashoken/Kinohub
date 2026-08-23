@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { gridNavigationTarget } from "./navigation.js";
+import { describe, expect, it, vi } from "vitest";
+import { focusAndReveal, gridNavigationTarget } from "./navigation.js";
 
 function element(left: number, top: number, width = 180, height = 280) {
   const node = document.createElement("a");
@@ -9,6 +9,32 @@ function element(left: number, top: number, width = 180, height = 280) {
 }
 
 describe("TV grid navigation", () => {
+  it("keeps the focused item centered while content scrolls beneath it", () => {
+    const card = document.createElement("a");
+    card.focus = vi.fn();
+    card.scrollIntoView = vi.fn();
+
+    focusAndReveal(card);
+
+    expect(card.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(card.scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({
+      block: "center",
+      inline: "center",
+    }));
+  });
+
+  it("allows initial page focus to avoid horizontal repositioning", () => {
+    const card = document.createElement("a");
+    card.scrollIntoView = vi.fn();
+
+    focusAndReveal(card, "center", "nearest");
+
+    expect(card.scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({
+      block: "center",
+      inline: "nearest",
+    }));
+  });
+
   it("moves strictly through every card in a visual row", () => {
     const cards = [element(0, 0), element(200, 0), element(400, 0), element(600, 0)];
     expect(gridNavigationTarget(cards[0]!, cards, "ArrowRight")).toBe(cards[1]);
