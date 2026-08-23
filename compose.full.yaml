@@ -67,11 +67,11 @@ services:
   torrserver:
     <<: *common
     image: ghcr.io/yourok/torrserver:latest
-    environment: { TS_PORT: "8090", TS_PATH: /opt/ts, TS_DONTKILL: "1", TS_HTTPAUTH: "0" }
+    environment: { TS_IP: 0.0.0.0, TS_PORT: "8090", TS_PATH: /opt/ts, TS_DONTKILL: "1", TS_HTTPAUTH: "0" }
     ports: ["${LAN_BIND:-127.0.0.1}:${TORRSERVER_PORT:-8090}:8090"]
     volumes: [torrserver-data:/opt/ts]
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8090/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://$$(hostname -i):8090/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 20
