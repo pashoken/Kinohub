@@ -23,16 +23,6 @@ describe('mock API', () => {
     await app.close();
   });
 
-  it('serves an MSX start parameter and launcher content', async () => {
-    const app = buildApp(config);
-    const start = await app.inject({ method: 'GET', url: '/msx/start.json', headers: { origin: 'http://msx.benzac.de' } });
-    const content = await app.inject({ method: 'GET', url: '/msx/kinohub.json' });
-    expect(start.statusCode).toBe(200);
-    expect(start.headers['access-control-allow-origin']).toBe('*');
-    expect(start.json()).toMatchObject({ name: 'KinoHub', parameter: expect.stringContaining('/msx/kinohub.json') });
-    expect(content.json().items[0]).toMatchObject({ focus: true, action: expect.stringMatching(/^link:http/) });
-    await app.close();
-  });
 });
 
 describe('configuration', () => {

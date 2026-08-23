@@ -55,5 +55,3 @@ docker compose -f compose.seerr.yaml up -d
 ```
 
 Seerr откроется на `http://127.0.0.1:5055`, а настройки сохранятся в именованном томе. Этот вариант удобен, если остальные сервисы уже работают отдельно.
-
-Для Media Station X укажите `HOST:PORT` KinoHub (например, `192.168.1.50:4100`) в Settings → Start Parameter → Setup. MSX загрузит `/msx/start.json` автоматически.

@@ -437,23 +437,21 @@ describe("playback panel", () => {
     },
   ];
   it("builds an Android ACTION_VIEW intent with a safe browser fallback", () => {
-    const target = "http://192.168.0.120:8091/stream?link=abc&index=1";
+    const target = "http://192.168.1.50:8090/stream?link=abc&index=1";
     const intent = androidPlayerIntent(target, "video/*");
-    expect(intent).toContain("intent://192.168.0.120:8091/stream?link=abc&index=1#Intent;scheme=http;type=video/*");
+    expect(intent).toContain("intent://192.168.1.50:8090/stream?link=abc&index=1#Intent;scheme=http;type=video/*");
     expect(intent).toContain(`S.browser_fallback_url=${encodeURIComponent(target)}`);
   });
-  it("uses a plain TorrServer URL inside MSX Android WebView", () => {
-    const target = "http://192.168.0.120:8091/stream?link=abc&index=1";
+  it("uses a plain TorrServer URL inside an embedded Android WebView", () => {
+    const target = "http://192.168.1.50:8090/stream?link=abc&index=1";
     const webViewAgent =
       "Mozilla/5.0 (Linux; Android 11; TV; wv) AppleWebKit/537.36 Version/4.0 Chrome/120 Safari/537.36";
-    expect(externalPlayerUrl(target, "video/*", webViewAgent, "")).toBe(target);
-    expect(externalPlayerUrl(target, "video/*", "Mozilla/5.0 (Linux; Android 14) Chrome/120 Mobile", "")).toMatch(/^intent:\/\//);
-    expect(externalPlayerUrl(target, "video/*", "Mozilla/5.0 (Linux; Android 11)", "https://msx.benzac.de/"))
-      .toBe(target);
+    expect(externalPlayerUrl(target, "video/*", webViewAgent)).toBe(target);
+    expect(externalPlayerUrl(target, "video/*", "Mozilla/5.0 (Linux; Android 14) Chrome/120 Mobile")).toMatch(/^intent:\/\//);
   });
   it("builds a private playback URI only for the thin Android TV app", () => {
     const target = files[0]!.streamUrl;
-    const uri = externalPlayerUrl(target, "video/*", "Android KinoHubTV/0.1", "");
+    const uri = externalPlayerUrl(target, "video/*", "Android KinoHubTV/0.1");
     expect(uri).toMatch(/^kinohub-player:\/\/play\?/);
     expect(new URL(uri).searchParams.get("url")).toBe(target);
     expect(new URL(uri).searchParams.get("mime")).toBe("video/*");

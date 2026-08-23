@@ -74,36 +74,6 @@ export function buildApp(config: AppConfig) {
   app.get("/api/health", async () =>
     healthSchema.parse({ status: "ok", mode: config.APP_MODE }),
   );
-  app.get("/msx/start.json", async (_request, reply) => reply
-    .header("access-control-allow-origin", "*")
-    .header("cache-control", "no-store")
-    .send({
-      name: "KinoHub",
-      version: "1.0.0",
-      parameter: `content:${config.PUBLIC_APP_ORIGIN}/msx/kinohub.json`,
-      welcome: "content",
-      launcher: { icon: "movie", color: "msx-orange" },
-    }));
-  app.get("/msx/kinohub.json", async (_request, reply) => reply
-    .header("access-control-allow-origin", "*")
-    .header("cache-control", "no-store")
-    .send({
-      type: "pages",
-      headline: "KinoHub",
-      template: {
-        type: "default",
-        layout: "0,0,4,3",
-        color: "msx-glass",
-        icon: "movie",
-        action: `link:${config.PUBLIC_APP_ORIGIN}/`,
-      },
-      items: [{
-        title: "Открыть KinoHub",
-        titleFooter: "Домашний кинотеатр",
-        focus: true,
-        action: `link:${config.PUBLIC_APP_ORIGIN}/`,
-      }],
-    }));
   app.get("/api/catalog", async () => {
     if (!seerr) return catalogSchema.parse(fixtureCatalog);
     const pages = await Promise.all(liveRails.map((rail) => seerr.discover(1, rail.options)));

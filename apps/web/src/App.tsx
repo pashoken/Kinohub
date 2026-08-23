@@ -620,7 +620,6 @@ export function externalPlayerUrl(
   target: string,
   mimeType: string,
   userAgent = navigator.userAgent,
-  referrer = document.referrer,
 ): string {
   if (/KinoHubTV\//i.test(userAgent)) {
     const params = new URLSearchParams({ url: target, mime: mimeType });
@@ -628,8 +627,7 @@ export function externalPlayerUrl(
   }
   const android = /Android/i.test(userAgent);
   const embeddedWebView =
-    /\bwv\b|; wv\)|Version\/4\.0.*Chrome/i.test(userAgent) ||
-    /(?:^|:\/\/|\.)msx\.benzac\.de(?:\/|$)/i.test(referrer);
+    /\bwv\b|; wv\)|Version\/4\.0.*Chrome/i.test(userAgent);
   return android && !embeddedWebView
     ? androidPlayerIntent(target, mimeType)
     : target;

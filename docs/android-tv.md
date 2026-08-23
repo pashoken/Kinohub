@@ -1,46 +1,55 @@
-# KinoHub TV APK
+# Приложение KinoHub для Android TV и проекторов
 
-`apps/android` is a deliberately thin Android TV shell around the hosted KinoHub UI.
-It uses the device's system WebView and contains no browser engine, media player,
-background service, AndroidX, Kotlin runtime, analytics, or third-party dependency.
+## Что это за приложение
 
-## Runtime behavior
+APK — тонкая оболочка над KinoHub, работающим на домашнем сервере. Каталог и настройки остаются на сервере, поэтому при смене сервера APK не нужно переустанавливать: адрес можно изменить внутри приложения.
 
-- Asks for the KinoHub server address on first launch and stores it locally.
-- Lets the user change that address later from KinoHub's **Настройка** page.
-- Reopens the native address dialog when the configured server cannot be reached.
-- Keeps DPAD navigation and focus handling in the shared web application.
-- Gives the web UI first chance to close dialogs or dismiss the keyboard on Back.
-- Intercepts only `kinohub-player://` links generated for the `KinoHubTV` user agent.
-- Validates that playback targets use HTTP(S), then opens Android's native player chooser.
-- Keeps ordinary browser and MSX playback behavior unchanged.
+Приложение:
 
-The initial suggestion is compiled in `apps/android/app/build.gradle` as `KINOHUB_URL`,
-but moving KinoHub to another host does not require rebuilding or reinstalling the APK.
+- спрашивает адрес KinoHub при первом запуске и сохраняет его;
+- управляется пультом через DPAD;
+- открывает выбранное видео во внешнем Android-плеере;
+- повторно предлагает изменить адрес, если сервер недоступен;
+- не содержит аналитики, фоновых сервисов и собственного медиаплеера.
 
-## Install
+## Установка для обычного пользователя
 
-The current sideloadable artifact is `artifacts/apk/kinohub-tv-0.3.0.apk`.
-It is optimized with R8/resource shrinking and signed with a local debug key for private testing.
+Для публичной раздачи нужен APK, подписанный постоянным release-ключом и опубликованный на странице GitHub Releases. Текущий локальный `kinohub-tv-0.3.0.apk` подписан тестовым debug-ключом и предназначен только для частной проверки; публиковать его как стабильный релиз не следует.
 
-Install it by copying the APK to the projector and opening it with a file manager, or via ADB:
+После появления release APK:
 
-```powershell
-adb connect PROJECTOR_IP:5555
-adb install -r artifacts/apk/kinohub-tv-0.3.0.apk
+1. Скачайте файл APK на флешку или непосредственно на Android TV/проектор.
+2. В настройках устройства разрешите установку из неизвестных источников для файлового менеджера.
+3. Откройте APK и подтвердите установку.
+4. При первом запуске введите адрес KinoHub, например `http://192.168.1.50:4100/`.
+5. Установите VLC, Vimu или другой плеер, способный открывать HTTP-видео.
+
+Телевизор должен находиться в одной сети с сервером и открывать как KinoHub, так и `PUBLIC_TORRSERVER_URL`.
+
+## Установка через ADB
+
+```bash
+adb connect IP_ТЕЛЕВИЗОРА:5555
+adb install -r kinohub-tv.apk
 ```
 
-The TV/projector must be able to reach the configured KinoHub address and the
-`PUBLIC_TORRSERVER_URL` from `.env`. Use the server's real LAN hostname or static IP.
+ADB должен быть включён в параметрах разработчика Android TV.
 
-## Build
+## Сборка для разработчика
 
-Required build components are JDK 17, Android SDK platform 35, and Gradle 8.9.
-From `apps/android`, run:
+Нужны JDK 17, Android SDK Platform 35 и Gradle 8.9:
 
-```powershell
+```bash
+cd apps/android
 gradle :app:assembleRelease
 ```
 
-For distribution beyond private sideload testing, replace the debug signing configuration
-with a persistent private release keystore and increment `versionCode`.
+Перед публичным релизом необходимо:
+
+1. создать и безопасно сохранить release keystore;
+2. заменить debug signing в `apps/android/app/build.gradle` на release signing;
+3. увеличить `versionCode` и `versionName`;
+4. собрать APK и проверить установку поверх предыдущей версии;
+5. опубликовать APK и контрольную SHA-256 сумму в GitHub Releases.
+
+Потеря release keystore лишит возможности выпускать обновления поверх уже установленного приложения, поэтому ключ нельзя хранить в репозитории.
