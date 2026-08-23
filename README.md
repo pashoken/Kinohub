@@ -7,7 +7,7 @@
 Требования: Linux/Windows-сервер с Docker Engine/Desktop и Docker Compose v2.
 
 ```bash
-git clone <repository-url> kinohub
+git clone https://github.com/pashoken/Kinohub.git kinohub
 cd kinohub
 cp .env.example .env
 nano .env
