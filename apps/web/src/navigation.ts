@@ -40,7 +40,7 @@ function visible(element: HTMLElement) {
 }
 
 type Direction = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
-const navigationGridSelector = ".rail, .movie-grid, .result-grid, .actions, .episode-picker, .player-ready, .file-list, .rating-grid, .season-grid, .search-field, nav";
+const navigationGridSelector = ".rail, .movie-grid, .result-grid, .actions, .episode-picker, .player-ready, .file-list, .choice-list, .rating-grid, .season-grid, .search-field, nav";
 
 function visualRows(elements: HTMLElement[]): HTMLElement[][] {
   const sorted = [...elements].sort((left, right) => {
@@ -125,7 +125,7 @@ export function useSpatialNavigation() {
           : undefined;
       if (!current) {
         event.preventDefault();
-        candidates[0]?.focus();
+        focusNavigationTarget(candidates[0]!);
         return;
       }
       const navigationGrid = current.closest<HTMLElement>(navigationGridSelector);
@@ -258,9 +258,18 @@ export function useDialogFocus(
         items[0]?.focus();
       }
     };
+    const containFocus = (event: FocusEvent) => {
+      if (!ref.current || ref.current.contains(event.target as Node)) return;
+      const topDialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1);
+      if (topDialog !== ref.current) return;
+      const first = ref.current.querySelector<HTMLElement>(focusSelector);
+      if (first) focusAndReveal(first, "nearest", "nearest");
+    };
     document.addEventListener("keydown", trap);
+    document.addEventListener("focusin", containFocus);
     return () => {
       document.removeEventListener("keydown", trap);
+      document.removeEventListener("focusin", containFocus);
       queueMicrotask(() => {
         if (origin?.isConnected) origin.focus();
         else
