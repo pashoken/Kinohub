@@ -263,11 +263,21 @@ export function buildApp(config: AppConfig) {
     const path = (request.params as { "*": string })["*"];
     if (!/^(?:w\d+|original)\/[A-Za-z0-9._/-]+$/.test(path))
       return reply.code(400).send({ code: "INVALID_IMAGE", message: "Некорректный путь изображения" });
-    const response = await fetch(`https://image.tmdb.org/t/p/${path}`, { signal: AbortSignal.timeout(8_000) });
-    if (!response.ok) return reply.code(response.status).send({ code: "IMAGE_UNAVAILABLE", message: "Изображение недоступно" });
-    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
-    if (!contentType.startsWith("image/")) return reply.code(502).send({ code: "INVALID_IMAGE_RESPONSE", message: "Источник вернул не изображение" });
-    return reply.type(contentType).header("cache-control", "public, max-age=86400").send(Buffer.from(await response.arrayBuffer()));
+    const sources = [
+      ...(config.SEERR_URL ? [new URL(`/imageproxy/tmdb/t/p/${path}`, config.SEERR_URL).toString()] : []),
+      `https://image.tmdb.org/t/p/${path}`,
+    ];
+    for (const source of sources) {
+      try {
+        const response = await fetch(source, { signal: AbortSignal.timeout(10_000) });
+        const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+        if (!response.ok || !contentType.startsWith("image/")) continue;
+        return reply.type(contentType).header("cache-control", "public, max-age=86400").send(Buffer.from(await response.arrayBuffer()));
+      } catch {
+        continue;
+      }
+    }
+    return reply.code(502).send({ code: "IMAGE_UNAVAILABLE", message: "Изображение недоступно" });
   });
   if (config.NODE_ENV === "production") {
     void app.register(staticPlugin, {
