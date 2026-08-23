@@ -12,7 +12,9 @@ test-results/
 local.properties
 apps/android/app/build/
 .android-tooling/
+.android-signing/
 artifacts/apk/*.apk
+artifacts/apk/*.sha256
 
 # Machine-specific administration helpers and diagnostics
 connect-samba.cmd

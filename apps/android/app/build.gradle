@@ -2,6 +2,12 @@ plugins {
     id "com.android.application"
 }
 
+def releaseKeystorePath = System.getenv("KINOHUB_KEYSTORE_PATH")
+def releaseKeystorePassword = System.getenv("KINOHUB_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("KINOHUB_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("KINOHUB_KEY_PASSWORD")
+def releaseSigningReady = [releaseKeystorePath, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
+
 android {
     namespace "ru.kinohub.tv"
     compileSdk 35
@@ -10,8 +16,8 @@ android {
         applicationId "ru.kinohub.tv"
         minSdk 23
         targetSdk 35
-        versionCode 3
-        versionName "0.3.0"
+        versionCode 4
+        versionName "0.4.0"
         buildConfigField "String", "KINOHUB_URL", '"http://kinohub.local:4100/"'
     }
 
@@ -19,11 +25,22 @@ android {
         buildConfig true
     }
 
+    signingConfigs {
+        release {
+            if (releaseSigningReady) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
-            signingConfig signingConfigs.debug
+            if (releaseSigningReady) signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
