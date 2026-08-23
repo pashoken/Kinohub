@@ -49,13 +49,6 @@ test("final TV screenshot matrix covers every golden surface", async ({
     await page.screenshot({
       path: `artifacts/screenshots/final-detail-${size}.png`,
     });
-    await page.getByRole("button", { name: "Скачать 1080p" }).click();
-    await page.getByRole("button", { name: "Подтвердить" }).click();
-    await expect(page.getByRole("status")).toContainText("очередь");
-    await page.screenshot({
-      path: `artifacts/screenshots/final-request-${size}.png`,
-    });
-    await page.goto("/movies/movie-1");
     await page.getByRole("button", { name: "Смотреть сейчас" }).click();
     const chooser = page.getByRole("dialog", { name: "Выберите версию" });
     await expect(chooser.locator("button.choice").first()).toBeVisible();

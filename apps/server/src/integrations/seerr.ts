@@ -35,8 +35,6 @@ const seerrSeriesSchema = z.object({
   mediaInfo: z.object({ status: z.number().optional() }).optional()
 });
 
-export type SeerrRequestInput = { mediaId: string; serverId: number; profileId: number };
-
 export class SeerrClient {
   constructor(private readonly baseUrl: URL, private readonly apiKey: string, private readonly policy: HttpPolicy = {}) {}
 
@@ -79,6 +77,14 @@ export class SeerrClient {
     return normalizeSeriesList(payload.results);
   }
 
+  async searchMedia(query: string): Promise<{ movies: Movie[]; series: Series[] }> {
+    const payload = await this.call<{ results: unknown[] }>(`/api/v1/search?query=${encodeURIComponent(query)}&page=1`);
+    return {
+      movies: normalizeMovieList(payload.results),
+      series: normalizeSeriesList(payload.results),
+    };
+  }
+
   async search(query: string): Promise<Movie[]> {
     const payload = await this.call<{ results: unknown[] }>(`/api/v1/search?query=${encodeURIComponent(query)}&page=1`);
     return normalizeMovieList(payload.results);
@@ -88,17 +94,6 @@ export class SeerrClient {
     return normalizeSeerrMovie(await this.call(`/api/v1/movie/${encodeURIComponent(id)}`));
   }
 
-  async request(input: SeerrRequestInput): Promise<unknown> {
-    return this.call('/api/v1/request', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mediaType: 'movie', mediaId: Number(input.mediaId), serverId: input.serverId, profileId: input.profileId })
-    });
-  }
-
-  async status(id: string): Promise<unknown> {
-    return this.call(`/api/v1/movie/${encodeURIComponent(id)}`);
-  }
 }
 
 function normalizeSeriesList(values: unknown[]): Series[] {

@@ -12,8 +12,6 @@ const envSchema = z.object({
   PUBLIC_APP_ORIGIN: z.string().url().default('http://127.0.0.1:5173'),
   SEERR_URL: optionalUrl,
   SEERR_API_KEY: optionalString(z.string().min(1)),
-  SEERR_SERVER_ID: z.coerce.number().int().positive().default(1),
-  SEERR_PROFILE_ID: z.coerce.number().int().positive().default(1),
   KINOPOISK_API_KEY: optionalString(z.string().uuid()),
   POISKKINO_API_KEY: optionalString(z.string().min(10)),
   JACKETT_URL: optionalUrl,
@@ -21,7 +19,6 @@ const envSchema = z.object({
   JACKETT_API_KEY: optionalString(z.string().min(1)),
   TORRSERVER_URL: optionalUrl,
   PUBLIC_TORRSERVER_URL: optionalUrl,
-  RADARR_URL: optionalUrl,
   JELLYFIN_URL: optionalUrl,
 }).superRefine((config, context) => {
   if (config.APP_MODE !== 'live') return;

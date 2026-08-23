@@ -15,14 +15,15 @@ export function playableFiles(files: TorrentFile[]): TorrentFile[] {
 export function sanitizeMetadata(value: string): string { return Array.from(value, (character) => { const code = character.charCodeAt(0); return code < 32 || code === 127 ? ' ' : character; }).join('').replace(/\s+/g, ' ').trim().slice(0, 160); }
 
 export class PlaybackCoordinator {
-  private readonly used = new Set<string>(); private readonly sessions = new Map<string, { session: PlaybackSession; expiresAt: number }>();
+  private readonly used = new Map<string, number>(); private readonly sessions = new Map<string, { session: PlaybackSession; expiresAt: number }>();
   constructor(private readonly releases: ReleaseCache, private readonly adapter: TorrServerAdapter, private readonly baseUrl: URL, private readonly ttlMs = 15 * 60_000, private readonly now = () => Date.now()) {
     if (!['http:', 'https:'].includes(baseUrl.protocol) || baseUrl.username || baseUrl.password) throw new PlaybackError('UNSAFE_STREAM_URL', 'Недопустимый адрес TorrServer');
   }
   async handoff(choiceId: string): Promise<PlaybackSession> {
+    this.pruneExpired();
     if (this.used.has(choiceId)) throw new PlaybackError('CHOICE_USED', 'Выбор уже использован');
     const raw = this.releases.resolve(choiceId); if (!raw) throw new PlaybackError('CHOICE_UNKNOWN', 'Выбор истёк или неизвестен');
-    this.used.add(choiceId);
+    this.used.set(choiceId, this.now() + this.ttlMs);
     try {
       const added = await this.adapter.add(raw.linkToken, sanitizeMetadata(raw.title)); const torrent = added.files?.length ? added : await this.adapter.inspect(added.hash);
       const files = playableFiles(torrent.files); if (!files.length) throw new PlaybackError('NO_PLAYABLE_FILES', 'В торренте нет видеофайлов');
@@ -38,7 +39,12 @@ export class PlaybackCoordinator {
       throw error;
     }
   }
-  getSession(id: string): PlaybackSession | null { const entry = this.sessions.get(id); if (!entry || entry.expiresAt <= this.now()) { this.sessions.delete(id); return null; } return entry.session; }
+  getSession(id: string): PlaybackSession | null { this.pruneExpired(); const entry = this.sessions.get(id); return entry?.session ?? null; }
+  private pruneExpired(): void {
+    const now = this.now();
+    for (const [id, expiresAt] of this.used) if (expiresAt <= now) this.used.delete(id);
+    for (const [id, entry] of this.sessions) if (entry.expiresAt <= now) this.sessions.delete(id);
+  }
   private safeStreamUrl(hash: string, fileId: number, path: string): URL {
     const candidate = this.adapter.streamUrl(hash, fileId, path); if (!['http:', 'https:'].includes(candidate.protocol) || candidate.origin !== this.baseUrl.origin) throw new PlaybackError('UNSAFE_STREAM_URL', 'TorrServer вернул небезопасную ссылку'); return candidate;
   }

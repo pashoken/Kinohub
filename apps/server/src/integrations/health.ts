@@ -1,7 +1,7 @@
 import type { AppConfig } from "../config.js";
 
 export type IntegrationName =
-  "seerr" | "radarr" | "jackett" | "torrserver" | "jellyfin";
+  "seerr" | "jackett" | "torrserver" | "jellyfin";
 export type IntegrationDiagnostic = {
   service: IntegrationName;
   mode: AppConfig["APP_MODE"];
@@ -11,7 +11,6 @@ export type IntegrationDiagnostic = {
 
 const envByService: Record<IntegrationName, string> = {
   seerr: "SEERR_URL",
-  radarr: "RADARR_URL",
   jackett: "JACKETT_URL",
   torrserver: "TORRSERVER_URL",
   jellyfin: "JELLYFIN_URL",

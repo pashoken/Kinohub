@@ -12,11 +12,6 @@ import { JackettClient } from "./integrations/jackett.js";
 import { SeerrClient } from "./integrations/seerr.js";
 import { KinopoiskClient, PoiskKinoClient } from "./integrations/kinopoisk.js";
 import { TorrServerClient } from "./integrations/torrserver.js";
-import {
-  mockRequestAdapter,
-  RequestCoordinator,
-  requestMovieSchema,
-} from "./requests.js";
 import { releaseFixtures } from "../../../fixtures/releases.js";
 import {
   rankRelease,
@@ -40,13 +35,6 @@ export function buildApp(config: AppConfig) {
   const jackett = config.APP_MODE === "live" && config.JACKETT_URL && config.JACKETT_API_KEY
     ? new JackettClient(new URL(config.JACKETT_URL), config.JACKETT_API_KEY, { timeoutMs: 30_000, retries: 0 }, new URL(config.PUBLIC_JACKETT_URL ?? config.JACKETT_URL))
     : undefined;
-  const requestAdapter = seerr
-    ? { async requestMovie(input: { movieId: string; mediaType: "movie"; serverId: number; profileId: number }) {
-        await seerr.request({ mediaId: input.movieId, serverId: input.serverId, profileId: input.profileId });
-        return { status: "queued" };
-      } }
-    : mockRequestAdapter();
-  const requests = new RequestCoordinator(requestAdapter, config.SEERR_SERVER_ID, config.SEERR_PROFILE_ID);
   const releases = new ReleaseCache();
   const torrServerInternal = new URL(config.TORRSERVER_URL ?? "http://torrserver:8090");
   const torrServerPublic = new URL(config.PUBLIC_TORRSERVER_URL ?? torrServerInternal);
@@ -119,11 +107,14 @@ export function buildApp(config: AppConfig) {
     const query = parsed.success
       ? (parsed.data.q ?? "").trim().toLocaleLowerCase("ru")
       : "";
-    if (seerr && query) return {
-      query,
-      movies: (await seerr.search(query)).map(proxyMovieImages),
-      series: (await seerr.searchSeries(query)).map(proxySeriesImages),
-    };
+    if (seerr && query) {
+      const results = await seerr.searchMedia(query);
+      return {
+        query,
+        movies: results.movies.map(proxyMovieImages),
+        series: results.series.map(proxySeriesImages),
+      };
+    }
     const movies = fixtureCatalog.rails.flatMap((rail) => rail.movies);
     return {
       query,
@@ -181,21 +172,6 @@ export function buildApp(config: AppConfig) {
         ? "Интеграции работают в тестовом режиме"
         : "Проверьте подключения домашних сервисов",
   }));
-  app.post("/api/requests", async (request, reply) => {
-    const origin = request.headers.origin;
-    if (origin && origin !== config.PUBLIC_APP_ORIGIN)
-      return reply.code(403).send({
-        code: "ORIGIN_DENIED",
-        message: "Источник запроса не разрешён",
-      });
-    const parsed = requestMovieSchema.safeParse(request.body);
-    if (!parsed.success)
-      return reply.code(400).send({
-        code: "INVALID_REQUEST",
-        message: "Некорректный идентификатор фильма",
-      });
-    return requests.request(parsed.data.movieId);
-  });
   app.post("/api/torrents/search", async (request, reply) => {
     const parsed = z
       .object({ movieId: z.string().min(1).max(80).optional(), seriesId: z.string().min(1).max(80).optional(), season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() })

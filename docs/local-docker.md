@@ -24,27 +24,24 @@ PUBLIC_APP_ORIGIN=http://192.168.1.50:4100
 
 Подставьте постоянный IPv4/hostname машины с Docker и разрешите порт только для доверенной LAN в firewall. Административные панели остальных сервисов по умолчанию остаются на `127.0.0.1`.
 
-## Полный медиастек
+## Полный потоковый стек
 
-`compose.full.yaml` поднимает KinoHub, Seerr, Radarr, Sonarr, qBittorrent, Jackett, TorrServer и Jellyfin:
+`compose.full.yaml` поднимает KinoHub, Seerr, Jackett, TorrServer и Jellyfin. Файлы фильмов на сервер не скачиваются. Jellyfin нужен только для настройки и авторизации Seerr.
 
 ```bash
 docker compose -f compose.full.yaml config
 docker compose -f compose.full.yaml --profile full up -d
 ```
 
-Сначала оставьте `APP_MODE=unconfigured`, настройте аккаунты, каталоги и связи через UI сервисов, затем перенесите URL/API-ключи в `.env`, выполните `npm run config:check` и переключите `APP_MODE=live`. Переменные описаны в [configuration.md](configuration.md).
+Сначала оставьте `APP_MODE=unconfigured`. Создайте администратора Jellyfin, затем выберите Jellyfin в первоначальной настройке Seerr и укажите `http://jellyfin:8096`. Библиотеки добавлять не нужно. Настройте индексаторы Jackett, перенесите URL/API-ключи в `.env`, выполните `npm run config:check` и переключите `APP_MODE=live`. Переменные описаны в [configuration.md](configuration.md).
 
 | Сервис | Порт по умолчанию | Постоянные тома |
 |---|---:|---|
 | KinoHub | 4100 | нет |
 | Seerr | 5055 | `seerr-config` |
-| Radarr | 7878 | `radarr-config`, `media`, `downloads` |
-| Sonarr | 8989 | `sonarr-config`, `media`, `downloads` |
-| qBittorrent | 8080 | `qbittorrent-config`, `downloads` |
-| Jackett | 9117 | `jackett-config`, `downloads` |
+| Jackett | 9117 | `jackett-config` |
 | TorrServer | 8090 | `torrserver-data` |
-| Jellyfin | 8096 | `jellyfin-config`, `jellyfin-cache`, `media` |
+| Jellyfin | 8096 | `jellyfin-config`, `jellyfin-cache` |
 
 `docker compose down` сохраняет тома. Не используйте `docker compose down -v`, если не собираетесь безвозвратно удалить конфигурацию и базы. Перед обновлением делайте резервную копию томов.
 

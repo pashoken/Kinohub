@@ -56,14 +56,12 @@ describe("Seerr adapter fixtures", () => {
     expect(normalizeSeerrSeries(seerrSeriesFixture)).toMatchObject({ id: "1399", title: "Игра престолов", numberOfSeasons: 8, seasons: [{ seasonNumber: 1, episodeCount: 10 }] });
   });
 
-  it("keeps X-Api-Key on the backend for discover, search, detail, request, and status", async () => {
+  it("keeps X-Api-Key on the backend for discover, search, and detail", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl = vi.fn(
       async (input: string | URL | Request, init?: RequestInit) => {
         calls.push({ url: String(input), ...(init ? { init } : {}) });
-        const body = String(input).includes("/request")
-          ? { id: 1 }
-          : String(input).includes("/discover") ||
+        const body = String(input).includes("/discover") ||
               String(input).includes("/search")
             ? { results: [seerrMovieFixture] }
             : seerrMovieFixture;
@@ -78,9 +76,7 @@ describe("Seerr adapter fixtures", () => {
     await client.discover();
     await client.search("Бойцовский клуб");
     await client.detail("550");
-    await client.request({ mediaId: "550", serverId: 1, profileId: 2 });
-    await client.status("550");
-    expect(calls).toHaveLength(5);
+    expect(calls).toHaveLength(3);
     expect(
       calls.every(
         (call) =>
@@ -267,7 +263,7 @@ describe("TorrServer contract and safe diagnostics", () => {
     expect(mock.every((item) => item.status === "mock")).toBe(true);
     expect(missing.every((item) => item.status === "missing")).toBe(true);
     expect(live.find((item) => item.service === "seerr")?.status).toBe("ready");
-    expect(mock.map((item) => item.service)).toContain("radarr");
+    expect(mock.map((item) => item.service)).toEqual(["seerr", "jackett", "torrserver", "jellyfin"]);
     expect(JSON.stringify(live)).not.toContain("private.test");
   });
 

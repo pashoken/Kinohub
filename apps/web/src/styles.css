@@ -260,11 +260,6 @@ input:focus-visible {
   flex: 0 0 auto;
   fill: currentColor;
 }
-.download-action {
-  color: #c3cad8;
-  background: rgba(255, 255, 255, 0.075);
-  font-weight: 500;
-}
 .watchlist-action {
   color: #dce5ff;
   border: 1px solid rgba(157, 181, 255, 0.5);
@@ -303,36 +298,6 @@ input:focus-visible {
 .watchlist-empty {
   max-width: 620px;
   padding-top: 28px;
-}
-.request-sheet {
-  position: fixed;
-  z-index: 20;
-  inset: auto clamp(24px, 6vw, 100px) clamp(24px, 8vh, 90px);
-  max-width: 760px;
-  padding: 30px;
-  border: 1px solid #3a4864;
-  border-radius: 20px;
-  background: #121a2a;
-  box-shadow: 0 24px 80px #000;
-}
-.request-sheet h2 {
-  margin-top: 0;
-}
-.policy {
-  color: #b9c8ff;
-  font-size: 20px;
-  font-weight: 800;
-}
-.request-status {
-  display: grid;
-  gap: 10px;
-  padding: 16px 20px;
-  border: 1px solid #34415c;
-  border-radius: 12px;
-  background: #101827;
-}
-.request-status a {
-  color: #a9bdff;
 }
 .choice-drawer {
   position: fixed;

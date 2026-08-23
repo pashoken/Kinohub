@@ -12,11 +12,6 @@ const catalog = (await json("/api/catalog")) as {
 };
 const movieId = catalog.rails[0]?.movies[0]?.id;
 if (!movieId) throw new Error("catalog has no movie");
-const request = await json("/api/requests", {
-  method: "POST",
-  headers: { "content-type": "application/json", origin: base },
-  body: JSON.stringify({ movieId }),
-});
 const search = (await json("/api/torrents/search", {
   method: "POST",
   headers: { "content-type": "application/json" },
@@ -32,5 +27,5 @@ const handoff = await json("/api/playback/handoff", {
   body: JSON.stringify({ choiceId: choice.id }),
 });
 process.stdout.write(
-  `SMOKE_OK health=${String(health.status)} rails=${catalog.rails.length} request=${String(request.state)} choices=${search.choices.length} playback=${String(handoff.status)}\n`,
+  `SMOKE_OK health=${String(health.status)} rails=${catalog.rails.length} choices=${search.choices.length} playback=${String(handoff.status)}\n`,
 );

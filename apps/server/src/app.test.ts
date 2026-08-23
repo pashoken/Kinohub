@@ -14,15 +14,6 @@ describe('mock API', () => {
     await app.close();
   });
 
-  it('enforces origin on request mutations', async () => {
-    const app = buildApp(config);
-    const denied = await app.inject({ method: 'POST', url: '/api/requests', headers: { origin: 'http://evil.test' }, payload: { movieId: '550' } });
-    const allowed = await app.inject({ method: 'POST', url: '/api/requests', headers: { origin: config.PUBLIC_APP_ORIGIN }, payload: { movieId: '550' } });
-    expect(denied.statusCode).toBe(403);
-    expect(allowed.json()).toMatchObject({ state: 'queued' });
-    await app.close();
-  });
-
 });
 
 describe('configuration', () => {

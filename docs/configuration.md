@@ -14,8 +14,6 @@ LAN_BIND=0.0.0.0
 
 SEERR_URL=http://host.docker.internal:5055
 SEERR_API_KEY=вставьте_ключ_из_Seerr
-SEERR_SERVER_ID=1
-SEERR_PROFILE_ID=1
 
 JACKETT_URL=http://host.docker.internal:9117
 PUBLIC_JACKETT_URL=http://host.docker.internal:9117
@@ -35,10 +33,6 @@ POISKKINO_API_KEY=
 ### `SEERR_API_KEY`
 
 Откройте Seerr → **Settings → General → API Key**. Ключ уже создан автоматически; при необходимости рядом есть кнопка генерации нового. Seerr предупреждает, что этот ключ даёт административный доступ, поэтому его нельзя публиковать. [Официальная страница Seerr](https://docs.seerr.dev/using-seerr/settings/general/).
-
-### `SEERR_SERVER_ID` и `SEERR_PROFILE_ID`
-
-Это идентификаторы Radarr-сервера и профиля качества, которые Seerr использует при заявке фильма. Для первой попытки оставьте `1` и `1` — это типичные ID первой конфигурации. Если добавление фильма завершается ошибкой, проверьте выбранные Radarr server и quality profile в **Seerr → Settings → Services**. API key самого Radarr находится в **Radarr → Settings → General → Security**, что также указано в [официальной инструкции Seerr](https://docs.seerr.dev/using-seerr/settings/services/).
 
 ### `JACKETT_API_KEY`
 

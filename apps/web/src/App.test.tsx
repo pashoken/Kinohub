@@ -22,7 +22,6 @@ import {
   MovieDetails,
   MoviePoster,
   PlaybackPanel,
-  RequestAction,
   readContinueWatching,
   Search,
   SeasonPicker,
@@ -121,7 +120,6 @@ describe("catalog surfaces", () => {
     expect(screen.getByText("Не добавлен")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "← Назад" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("button", { name: "Смотреть сейчас" })).toHaveClass("primary");
-    expect(screen.getByRole("button", { name: "Скачать 1080p" })).toHaveClass("download-action");
     expect(screen.getByRole("button", { name: "Буду смотреть" })).toHaveClass("watchlist-action");
   });
 
@@ -301,53 +299,6 @@ describe("debounced cancellable search", () => {
         screen.getByRole("button", { name: "Повторить" }),
       ).toBeInTheDocument(),
     );
-  });
-});
-
-describe("request action", () => {
-  it("shows honest quality policy and sends one request during rapid activation", async () => {
-    let resolveRequest!: (value: { state: "queued" }) => void;
-    const requester = vi.fn(
-      () =>
-        new Promise<{ state: "queued" }>((resolve) => {
-          resolveRequest = resolve;
-        }),
-    );
-    render(<RequestAction movieId="550" requester={requester} />);
-    fireEvent.click(screen.getByRole("button", { name: "Скачать 1080p" }));
-    expect(
-      screen.getByText("1080p SDR · H.264 предпочтительно"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/будет подтверждён Seerr\/Radarr/),
-    ).toBeInTheDocument();
-    const confirm = screen.getByRole("button", { name: "Подтвердить" });
-    fireEvent.click(confirm);
-    fireEvent.click(confirm);
-    expect(requester).toHaveBeenCalledTimes(1);
-    resolveRequest({ state: "queued" });
-    expect(
-      await screen.findByText("Фильм добавлен в очередь"),
-    ).toBeInTheDocument();
-  });
-  it.each([
-    ["existing", "Этот фильм уже добавлен"],
-    ["pending", "Отправляем запрос…"],
-    ["processing", "Фильм загружается"],
-    ["available", "Фильм доступен в медиатеке"],
-    ["failed", "Не удалось добавить фильм"],
-    ["timeout", "Сервис не ответил вовремя"],
-    ["permission_denied", "Недостаточно прав для запроса"],
-  ] as const)("renders distinct %s state", (state, copy) => {
-    render(<RequestAction movieId="550" initialState={state} />);
-    expect(screen.getByText(copy)).toBeInTheDocument();
-  });
-  it("Jellyfin link contains no token or api key", () => {
-    render(<RequestAction movieId="550" initialState="available" />);
-    const href = screen
-      .getByRole("link", { name: "Открыть в Jellyfin" })
-      .getAttribute("href");
-    expect(href).not.toMatch(/token|api[_-]?key/i);
   });
 });
 

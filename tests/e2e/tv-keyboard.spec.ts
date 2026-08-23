@@ -10,29 +10,11 @@ async function openFirstMovie(page: import("@playwright/test").Page) {
   await expect(page.getByRole("link", { name: "На главную" })).toBeVisible();
 }
 
-test("browse → request works with remote-like keyboard input", async ({
-  page,
-}) => {
-  await openFirstMovie(page);
-  for (let index = 0; index < 6; index += 1) await page.keyboard.press("Tab");
-  await page.keyboard.press("Enter");
-  const dialog = page.getByRole("dialog", { name: "Добавить фильм?" });
-  await expect(dialog).toBeVisible();
-  await page.keyboard.press("Shift+Tab");
-  await expect(dialog.locator(":focus")).toBeVisible();
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("status")).toContainText(/очередь|добавлен/i);
-  await page.screenshot({
-    path: "artifacts/screenshots/phase7-request-keyboard-1280x720.png",
-  });
-});
-
 test("browse → watch → choose file works with keyboard input", async ({
   page,
 }) => {
   await openFirstMovie(page);
-  for (let index = 0; index < 7; index += 1) await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: "Смотреть сейчас" }).focus();
   await page.keyboard.press("Enter");
   const chooser = page.getByRole("dialog", { name: "Выберите версию" });
   await expect(chooser).toBeVisible();
@@ -60,7 +42,7 @@ test("directional focus, Escape, and PWA shell are projector safe", async ({
   await page.keyboard.press("ArrowDown");
   await expect(page.locator(":focus")).toBeVisible();
   await openFirstMovie(page);
-  for (let index = 0; index < 7; index += 1) await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: "Смотреть сейчас" }).focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("dialog", { name: "Выберите версию" }),

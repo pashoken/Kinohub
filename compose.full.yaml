@@ -1,7 +1,7 @@
-name: kinohub-full
+name: kinohub-stack
 x-common: &common
   restart: unless-stopped
-  networks: [media]
+  networks: [kinohub]
   profiles: [full]
 
 services:
@@ -19,8 +19,8 @@ services:
       APP_MODE: ${APP_MODE:-unconfigured}
       PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:-http://127.0.0.1:4100}
       SEERR_URL: http://seerr:5055
-      RADARR_URL: http://radarr:7878
       JACKETT_URL: http://jackett:9117
+      PUBLIC_JACKETT_URL: http://jackett:9117
       TORRSERVER_URL: http://torrserver:8090
       JELLYFIN_URL: http://jellyfin:8096
     ports: ["${LAN_BIND:-127.0.0.1}:${KINOHUB_PORT:-4100}:4100"]
@@ -38,69 +38,25 @@ services:
   seerr:
     <<: *common
     image: ghcr.io/seerr-team/seerr:latest
-    environment: { LOG_LEVEL: info, TZ: "${TZ:-Etc/UTC}" }
+    init: true
+    environment: { LOG_LEVEL: info, TZ: "${TZ:-Etc/UTC}", PORT: "5055" }
     ports: ["127.0.0.1:${SEERR_PORT:-5055}:5055"]
     volumes: [seerr-config:/app/config]
     depends_on:
-      radarr: { condition: service_healthy }
-      sonarr: { condition: service_healthy }
+      jellyfin: { condition: service_healthy }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5055/api/v1/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:5055/api/v1/settings/public || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 20
       start_period: 30s
-
-  radarr:
-    <<: *common
-    image: lscr.io/linuxserver/radarr:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
-    ports: ["127.0.0.1:${RADARR_PORT:-7878}:7878"]
-    volumes: [radarr-config:/config, media:/media, downloads:/downloads]
-    depends_on:
-      qbittorrent: { condition: service_healthy }
-      jackett: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7878/ping >/dev/null || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
-  sonarr:
-    <<: *common
-    image: lscr.io/linuxserver/sonarr:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
-    ports: ["127.0.0.1:${SONARR_PORT:-8989}:8989"]
-    volumes: [sonarr-config:/config, media:/media, downloads:/downloads]
-    depends_on:
-      qbittorrent: { condition: service_healthy }
-      jackett: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8989/ping >/dev/null || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
-  qbittorrent:
-    <<: *common
-    image: lscr.io/linuxserver/qbittorrent:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}", WEBUI_PORT: "8080" }
-    ports: ["127.0.0.1:${QBITTORRENT_PORT:-8080}:8080"]
-    volumes: [qbittorrent-config:/config, downloads:/downloads]
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080 || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
 
   jackett:
     <<: *common
     image: lscr.io/linuxserver/jackett:latest
     environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
     ports: ["127.0.0.1:${JACKETT_PORT:-9117}:9117"]
-    volumes: [jackett-config:/config, downloads:/downloads]
+    volumes: [jackett-config:/config]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9117/UI/Dashboard >/dev/null || exit 1"]
       interval: 15s
@@ -112,7 +68,7 @@ services:
     <<: *common
     image: ghcr.io/yourok/torrserver:latest
     environment: { TS_PORT: "8090", TS_PATH: /opt/ts, TS_DONTKILL: "1", TS_HTTPAUTH: "0" }
-    ports: ["127.0.0.1:${TORRSERVER_PORT:-8090}:8090"]
+    ports: ["${LAN_BIND:-127.0.0.1}:${TORRSERVER_PORT:-8090}:8090"]
     volumes: [torrserver-data:/opt/ts]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8090/ || exit 1"]
@@ -126,7 +82,7 @@ services:
     image: jellyfin/jellyfin:latest
     user: "${PUID:-1000}:${PGID:-1000}"
     ports: ["127.0.0.1:${JELLYFIN_PORT:-8096}:8096"]
-    volumes: [jellyfin-config:/config, jellyfin-cache:/cache, media:/media:ro]
+    volumes: [jellyfin-config:/config, jellyfin-cache:/cache]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8096/health >/dev/null || exit 1"]
       interval: 15s
@@ -135,15 +91,10 @@ services:
       start_period: 30s
 
 networks:
-  media: { name: kinohub-media }
+  kinohub: { name: kinohub-stack }
 volumes:
   seerr-config:
-  radarr-config:
-  sonarr-config:
-  qbittorrent-config:
   jackett-config:
   torrserver-data:
   jellyfin-config:
   jellyfin-cache:
-  media:
-  downloads:
