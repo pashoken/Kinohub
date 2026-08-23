@@ -22,7 +22,7 @@ KinoHub — домашний каталог фильмов и сериалов �
 - Docker Engine с Docker Compose v2 или Docker Desktop;
 - постоянный IP сервера в домашней сети, например `192.168.1.50`;
 - Android TV/проектор с Android 6.0 или новее;
-- VLC, Vimu или другой плеер, умеющий открывать HTTP-видео;
+- Kodi (рекомендуется) либо другой плеер, умеющий открывать HTTP-видео;
 - доступ к индексаторам, которые вы самостоятельно добавите в Jackett.
 
 Если сервер находится в интернете, не открывайте административные панели и TorrServer всему интернету. Эта инструкция рассчитана прежде всего на доверенную домашнюю сеть.
@@ -105,7 +105,8 @@ Jellyfin остаётся в стеке, потому что владелец Se
 3. В качестве внутреннего адреса Jellyfin укажите `http://jellyfin:8096`. Это Docker-имя контейнера — здесь нельзя писать `localhost`.
 4. Введите администратора Jellyfin, созданного на предыдущем шаге.
 5. Если Seerr предложит выбрать библиотеки, продолжите без них.
-6. Завершите мастер, откройте **Settings → General** и скопируйте **API Key**. Это значение `SEERR_API_KEY`.
+6. В настройках пользователя установите русский язык, регион и язык поиска. Именно Seerr определяет, на каком языке KinoHub получает названия и описания.
+7. Завершите мастер, откройте **Settings → General** и скопируйте **API Key**. Это значение `SEERR_API_KEY`.
 
 API-ключ даёт административный доступ. Не публикуйте его в GitHub, issue, чатах и скриншотах. Подробнее: [официальная документация Seerr](https://docs.seerr.dev/using-seerr/settings/general/).
 
@@ -195,7 +196,7 @@ docker compose -f compose.full.yaml --profile full up -d --build --wait
 >
 > [Контрольная SHA-256](https://github.com/pashoken/Kinohub/releases/download/v0.4.0/kinohub-tv-0.4.0.apk.sha256) · Android 6.0+
 
-1. Установите VLC, Vimu или другой совместимый видеоплеер.
+1. Установите [Kodi](https://kodi.tv/download/android/) — это рекомендуемый плеер для телевизора и проектора. VLC и Vimu также можно использовать как альтернативу.
 2. Скачайте APK на флешку либо сразу на телевизор.
 3. Разрешите файловому менеджеру установку приложений из неизвестных источников.
 4. Установите и запустите KinoHub.
@@ -203,6 +204,8 @@ docker compose -f compose.full.yaml --profile full up -d --build --wait
 6. Откройте фильм, нажмите **Смотреть сейчас**, выберите раздачу и видеофайл.
 
 APK подписан постоянным release-ключом, поэтому новую версию можно устанавливать поверх старой. Установка через ADB описана в [docs/android-tv.md](docs/android-tv.md).
+
+Как KinoHub сортирует найденные раздачи и почему оригинальная английская дорожка сейчас получает дополнительный балл, описано в [инструкции по ранжированию раздач](docs/torrent-ranking.md). Там же показано, как отдать приоритет русской озвучке.
 
 ## Если Seerr, Jackett, TorrServer и Jellyfin уже установлены
 
@@ -307,7 +310,7 @@ docker compose -f compose.full.yaml --profile full restart
 docker compose -f compose.full.yaml --profile full down
 ```
 
-Подробное описание переменных: [docs/configuration.md](docs/configuration.md). Инструкция для Android TV: [docs/android-tv.md](docs/android-tv.md).
+Подробное описание переменных: [docs/configuration.md](docs/configuration.md). Инструкция для Android TV: [docs/android-tv.md](docs/android-tv.md). Правила сортировки раздач: [docs/torrent-ranking.md](docs/torrent-ranking.md).
 
 ## Для разработчиков
 
