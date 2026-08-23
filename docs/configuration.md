@@ -11,6 +11,7 @@ APP_MODE=live
 PUBLIC_APP_ORIGIN=http://192.168.1.50:4100
 KINOHUB_PORT=4100
 LAN_BIND=0.0.0.0
+ADMIN_BIND=127.0.0.1
 
 SEERR_URL=http://host.docker.internal:5055
 SEERR_API_KEY=вставьте_ключ_из_Seerr
@@ -27,6 +28,8 @@ POISKKINO_API_KEY=
 ```
 
 `host.docker.internal` означает «тот же компьютер, на котором запущен Docker». Этот адрес нужен контейнеру. Телевизор его не понимает, поэтому в `PUBLIC_*` всегда указывайте настоящий IP или hostname сервера.
+
+`LAN_BIND=0.0.0.0` открывает KinoHub и TorrServer для устройств домашней сети. `ADMIN_BIND=127.0.0.1` оставляет панели Seerr, Jackett и Jellyfin доступными только на самом сервере. Для первоначальной настройки на отдельном домашнем сервере можно временно установить `ADMIN_BIND=0.0.0.0`, а после настройки вернуть `127.0.0.1`.
 
 ## Где брать значения
 
