@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { Catalog, Movie, Series } from "@kinohub/contracts";
 import "./styles.css";
 import { focusAndReveal, useDialogFocus, usePageFocus, useSpatialNavigation } from "./navigation.js";
@@ -166,6 +167,27 @@ export function detailHref(kind: "movies" | "series", id: string, source = `${wi
   return `/${kind}/${encodeURIComponent(id)}?from=${encodeURIComponent(from)}`;
 }
 
+let openModalLayers = 0;
+function ModalLayer({ children, side = false }: { children: ReactNode; side?: boolean }) {
+  useEffect(() => {
+    openModalLayers += 1;
+    const main = document.querySelector<HTMLElement>("main");
+    main?.setAttribute("inert", "");
+    document.body.classList.add("modal-open");
+    return () => {
+      openModalLayers = Math.max(0, openModalLayers - 1);
+      if (openModalLayers === 0) {
+        main?.removeAttribute("inert");
+        document.body.classList.remove("modal-open");
+      }
+    };
+  }, []);
+  return createPortal(
+    <div className={`modal-layer ${side ? "modal-layer-side" : ""}`} data-modal-layer>{children}</div>,
+    document.body,
+  );
+}
+
 function TasteAction({ item, value = 0, onRate }: { item: MediaItem; value?: TasteScore | 0; onRate?: ((item: MediaItem, value: TasteScore | null) => void) | undefined }) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
@@ -176,12 +198,12 @@ function TasteAction({ item, value = 0, onRate }: { item: MediaItem; value?: Tas
   }, [open, value]);
   return <>
     <button className={`secondary focusable taste-action ${value ? "is-active" : ""}`} aria-haspopup="dialog" onClick={() => setOpen(true)}><span aria-hidden="true">★</span> {value ? `Моя оценка: ${value}/10` : "Оценить"}</button>
-    {open ? <section ref={dialogRef} className="rating-dialog" role="dialog" aria-modal="true" aria-labelledby="rating-title">
+    {open ? <ModalLayer><section ref={dialogRef} className="rating-dialog" role="dialog" aria-modal="true" aria-labelledby="rating-title">
       <div className="drawer-head"><div><p className="eyebrow">ВАША ОЦЕНКА</p><h2 id="rating-title">{item.title}</h2></div><button className="secondary focusable" data-dialog-close onClick={() => setOpen(false)}>Закрыть</button></div>
       <div className="rating-grid" aria-label="Оценка от 1 до 10">{Array.from({ length: 10 }, (_, index) => index + 1).map((score) => <button key={score} data-score={score} className={`focusable rating-score ${value === score ? "is-selected" : ""}`} aria-pressed={value === score} onClick={() => { onRate?.(item, score); setOpen(false); }}>{score}</button>)}</div>
       <p className="rating-scale"><span>Совсем не понравилось</span><span>Любимое</span></p>
       {value ? <button className="secondary focusable reset-rating" onClick={() => { onRate?.(item, null); setOpen(false); }}>Сбросить оценку</button> : null}
-    </section> : null}
+    </section></ModalLayer> : null}
   </>;
 }
 
@@ -195,13 +217,13 @@ export function SeasonPicker({ seasons, value, onChange }: { seasons: Series["se
   }, [open, value]);
   return <>
     <button className="secondary focusable season-picker-trigger" aria-haspopup="dialog" onClick={() => setOpen(true)}>Сезон {value} <span aria-hidden="true">▾</span></button>
-    {open ? <section ref={dialogRef} className="season-dialog" role="dialog" aria-modal="true" aria-labelledby="season-dialog-title">
+    {open ? <ModalLayer><section ref={dialogRef} className="season-dialog" role="dialog" aria-modal="true" aria-labelledby="season-dialog-title">
       <div className="drawer-head"><div><p className="eyebrow">ВЫБОР СЕЗОНА</p><h2 id="season-dialog-title">Какой сезон открыть?</h2></div><button className="secondary focusable" data-dialog-close onClick={() => setOpen(false)}>Закрыть</button></div>
       <div className="season-grid">{seasons.map((item) => {
         const select = () => { onChange(item.seasonNumber); setOpen(false); };
         return <button key={item.seasonNumber} data-season={item.seasonNumber} className={`focusable season-option ${value === item.seasonNumber ? "is-selected" : ""}`} aria-pressed={value === item.seasonNumber} onClick={select} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); select(); } }}>Сезон {item.seasonNumber}<small>{item.episodeCount} серий</small></button>;
       })}</div>
-    </section> : null}
+    </section></ModalLayer> : null}
   </>;
 }
 
@@ -433,6 +455,7 @@ export function RequestAction({
     );
   if (state === "confirm")
     return (
+      <ModalLayer>
       <div
         ref={requestDialogRef}
         className="request-sheet"
@@ -456,6 +479,7 @@ export function RequestAction({
           </button>
         </div>
       </div>
+      </ModalLayer>
     );
   return (
     <div className={`request-status state-${state}`} role="status">
@@ -513,6 +537,7 @@ export function TorrentChoiceDrawer({
     initialChoices,
   );
   const [error, setError] = useState(false);
+  const [searchSeconds, setSearchSeconds] = useState(0);
   const dialogRef = useRef<HTMLElement>(null);
   useDialogFocus(true, dialogRef);
   useEffect(() => {
@@ -535,7 +560,20 @@ export function TorrentChoiceDrawer({
       });
     return () => controller.abort();
   }, [movieId, seriesId, season, episode, initialChoices]);
+  useEffect(() => {
+    if (choices || error) return;
+    setSearchSeconds(0);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => setSearchSeconds(Math.floor((Date.now() - startedAt) / 1_000)), 1_000);
+    return () => window.clearInterval(timer);
+  }, [choices, error, movieId, seriesId, season, episode]);
+  useEffect(() => {
+    const firstChoice = dialogRef.current?.querySelector<HTMLElement>(".choice-list .focusable:not(:disabled)");
+    if (choices?.length && firstChoice)
+      queueMicrotask(() => focusAndReveal(firstChoice, "center", "nearest"));
+  }, [choices]);
   return (
+    <ModalLayer side>
     <aside
       ref={dialogRef}
       className="choice-drawer"
@@ -557,7 +595,10 @@ export function TorrentChoiceDrawer({
         </button>
       </div>
       {!choices && !error ? (
-        <p role="status">Ищем совместимые версии…</p>
+        <div className="torrent-search-status" role="status">
+          <span className="search-spinner" aria-hidden="true" />
+          <div><strong>Получаем ответы от трекеров · {searchSeconds} сек.</strong><p>Некоторые трекеры проходят дополнительную проверку защиты, поэтому первый поиск иногда занимает до минуты.</p></div>
+        </div>
       ) : null}
       {error ? (
         <div role="alert">
@@ -593,6 +634,7 @@ export function TorrentChoiceDrawer({
         ))}
       </div>
     </aside>
+    </ModalLayer>
   );
 }
 
@@ -726,6 +768,7 @@ export function PlaybackPanel({
     );
   }, [active]);
   return (
+    <ModalLayer>
     <section
       ref={dialogRef}
       className="player-panel"
@@ -809,6 +852,7 @@ export function PlaybackPanel({
         </div>
       ) : null}
     </section>
+    </ModalLayer>
   );
 }
 

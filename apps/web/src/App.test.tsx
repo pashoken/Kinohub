@@ -305,6 +305,23 @@ describe("debounced cancellable search", () => {
 });
 
 describe("request action", () => {
+  it("renders above an inert page and releases the page after closing", async () => {
+    render(
+      <>
+        <main><button>Главная</button></main>
+        <RequestAction movieId="550" />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Скачать 1080p" }));
+    expect(document.querySelector("[data-modal-layer]")).toContainElement(
+      screen.getByRole("dialog"),
+    );
+    expect(document.querySelector("main")).toHaveAttribute("inert");
+    expect(document.body).toHaveClass("modal-open");
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+    await waitFor(() => expect(document.querySelector("main")).not.toHaveAttribute("inert"));
+    expect(document.body).not.toHaveClass("modal-open");
+  });
   it("shows honest quality policy and sends one request during rapid activation", async () => {
     let resolveRequest!: (value: { state: "queued" }) => void;
     const requester = vi.fn(
@@ -415,6 +432,13 @@ describe("torrent choice drawer", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Поиск не ответил",
     );
+    vi.unstubAllGlobals();
+  });
+  it("shows a generic timed tracker status while results are pending", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+    render(<TorrentChoiceDrawer movieId="movie-pending" onClose={() => undefined} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Получаем ответы от трекеров · 0 сек.");
+    expect(screen.getByRole("status")).toHaveTextContent("первый поиск иногда занимает до минуты");
     vi.unstubAllGlobals();
   });
 });

@@ -38,7 +38,7 @@ export function buildApp(config: AppConfig) {
   const kinopoisk = config.KINOPOISK_API_KEY ? new KinopoiskClient(config.KINOPOISK_API_KEY) : undefined;
   const poiskKino = config.POISKKINO_API_KEY ? new PoiskKinoClient(config.POISKKINO_API_KEY) : undefined;
   const jackett = config.APP_MODE === "live" && config.JACKETT_URL && config.JACKETT_API_KEY
-    ? new JackettClient(new URL(config.JACKETT_URL), config.JACKETT_API_KEY, { timeoutMs: 30_000, retries: 0 }, new URL(config.PUBLIC_JACKETT_URL ?? config.JACKETT_URL))
+    ? new JackettClient(new URL(config.JACKETT_URL), config.JACKETT_API_KEY, { timeoutMs: 65_000, retries: 0 }, new URL(config.PUBLIC_JACKETT_URL ?? config.JACKETT_URL))
     : undefined;
   const requestAdapter = seerr
     ? { async requestMovie(input: { movieId: string; mediaType: "movie"; serverId: number; profileId: number }) {
