@@ -56,6 +56,18 @@ describe("Seerr adapter fixtures", () => {
     expect(normalizeSeerrSeries(seerrSeriesFixture)).toMatchObject({ id: "1399", title: "Игра престолов", numberOfSeasons: 8, seasons: [{ seasonNumber: 1, episodeCount: 10 }] });
   });
 
+  it("loads and normalizes TV recommendations from Seerr", async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      void input;
+      void init;
+      return new Response(JSON.stringify({ results: [seerrSeriesFixture] }), { status: 200 });
+    });
+    const client = new SeerrClient(new URL("http://seerr.test"), "server-only-key", { fetchImpl: fetchImpl as typeof fetch, retries: 0 });
+    await expect(client.seriesRecommendations("1399")).resolves.toMatchObject([{ id: "1399", title: "Игра престолов" }]);
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toBe("http://seerr.test/api/v1/tv/1399/recommendations?page=1");
+    expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("X-Api-Key")).toBe("server-only-key");
+  });
+
   it("keeps X-Api-Key on the backend for discover, search, and detail", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl = vi.fn(

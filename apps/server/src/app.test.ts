@@ -14,6 +14,13 @@ describe('mock API', () => {
     await app.close();
   });
 
+  it('returns an empty series recommendation rail in mock mode', async () => {
+    const app = buildApp(config);
+    const response = await app.inject({ method: 'GET', url: '/api/series/1399/recommendations' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ series: [] });
+    await app.close();
+  });
 });
 
 describe('configuration', () => {

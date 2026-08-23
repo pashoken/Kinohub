@@ -877,17 +877,16 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste =
     <article className={`details series-details ${series.backdropUrl ? "" : "missing-backdrop"}`} style={series.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(8,11,18,.98) 10%, rgba(8,11,18,.45)), url(${series.backdropUrl})` } : undefined}>
       <ContextBack />
       <div className="detail-content">
-        <p className="eyebrow detail-status">СЕРИАЛ · {series.numberOfSeasons} сез.</p>
+        <p className="eyebrow detail-status">СЕРИАЛ · {series.numberOfSeasons} сез. · {statusCopy[series.mediaStatus]}</p>
         <h1>{series.title}</h1>
-        <div className="detail-facts"><span className="meta">{series.year}{series.episodeRuntimeMinutes ? ` · ~${series.episodeRuntimeMinutes} мин` : ""}</span><Ratings movie={series} /><span className="genres">{series.genres.join(" · ")}</span></div>
+        <div className="detail-facts"><span className="meta">{series.year}{series.episodeRuntimeMinutes ? ` · ~${series.episodeRuntimeMinutes} мин` : ""}</span><Ratings movie={series} /><span className="genres">{series.genres.join(" · ") || "Жанр не указан"}</span></div>
         <p className="overview">{series.overview || "Описание пока недоступно."}</p>
-        <div className="episode-picker" aria-label="Выбор серии">
+        <div className="actions series-actions" aria-label="Действия с сериалом">
           {nextEpisode ? <button className="primary focusable movie-action continue-action" data-page-autofocus onClick={() => { setSeason(nextEpisode.info.season); setContinueFilePath(nextEpisode.file.path); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Продолжить просмотр · {nextEpisode.info.season} сезон, {nextEpisode.info.episode} серия</button> : null}
-          {!nextEpisode ? <SeasonPicker seasons={seasons} value={season} onChange={setSeason} /> : null}
           {!nextEpisode ? <button className="primary focusable movie-action" data-page-autofocus onClick={() => { setContinueFilePath(undefined); if (savedPack) setUseSavedPack(true); else setShowChoices(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{savedPack ? `Открыть серии ${season} сезона` : `Выбрать раздачу ${season} сезона`}</button> : null}
           <button className={`focusable movie-action watchlist-action ${watchlisted ? "is-watchlisted" : ""}`} aria-pressed={watchlisted} onClick={() => onToggleWatchlist?.(series)}><svg className="action-icon bookmark-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.75h12v17l-6-4-6 4z" /></svg>{watchlisted ? "В списке" : "Буду смотреть"}</button>
           <TasteAction item={series} value={taste} onRate={onRate} />
-          {nextEpisode ? <SeasonPicker seasons={seasons} value={season} onChange={setSeason} /> : null}
+          <SeasonPicker seasons={seasons} value={season} onChange={setSeason} />
           {nextEpisode ? <button className="secondary focusable movie-action" onClick={() => { setContinueFilePath(undefined); setUseSavedPack(true); }}><svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>{`Открыть серии ${season} сезона`}</button> : null}
           {savedPack ? <button className="secondary focusable" onClick={() => { removeSeriesPack(series.id); setSavedPack(undefined); setShowChoices(true); }}>Выбрать другую раздачу</button> : null}
         </div>
@@ -896,7 +895,27 @@ function SeriesDetails({ series, watchlisted = false, onToggleWatchlist, taste =
       {showChoices ? <TorrentChoiceDrawer seriesId={series.id} season={season} onClose={() => setShowChoices(false)} onSelect={(id, choice) => { setShowChoices(false); setReleaseName(choice.releaseName); setSelectedRelease(choice); setChoiceId(id); }} /> : null}
       {choiceId ? <PlaybackPanel choiceId={choiceId} releaseInfo={selectedRelease} seriesContext={{ seriesId: series.id, season }} onResolved={(result) => { const pack = { releaseName, files: result.files, releaseInfo: selectedRelease, series }; saveSeriesPack(series.id, pack); setSavedPack(pack); }} onClose={() => setChoiceId(undefined)} /> : null}
       {useSavedPack && savedPack ? <PlaybackPanel initialResult={{ status: "choose_file", files: savedPack.files }} {...(continueFilePath ? { initialFilePath: continueFilePath } : {})} releaseInfo={savedPack.releaseInfo} seriesContext={{ seriesId: series.id, season }} onClose={() => { setUseSavedPack(false); setContinueFilePath(undefined); setWatchProgressRevision((value) => value + 1); }} /> : null}
+      <SeriesRecommendations seriesId={series.id} />
     </article>
+  );
+}
+
+function SeriesRecommendations({ seriesId }: { seriesId: string }) {
+  const [series, setSeries] = useState<Series[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/series/${encodeURIComponent(seriesId)}/recommendations`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<{ series: Series[] }> : { series: [] })
+      .then((payload) => setSeries(payload.series))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [seriesId]);
+  if (!series.length) return null;
+  return (
+    <section className="recommendations" aria-labelledby="series-recommendations-title">
+      <h2 id="series-recommendations-title">Похожее на этот сериал</h2>
+      <div className="rail">{series.map((item) => <SeriesCard series={item} key={item.id} />)}</div>
+    </section>
   );
 }
 
@@ -906,7 +925,15 @@ function SeriesCatalog() {
   const [hasMore, setHasMore] = useState(true);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const focusAfterLoadRef = useRef<number | null>(null);
   useEffect(() => { const controller = new AbortController(); fetch("/api/series?page=1", { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error("series"); return response.json() as Promise<{ series: Series[]; hasMore: boolean }>; }).then((payload) => { setSeries(payload.series); setHasMore(payload.hasMore); }).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setFailed(true); }); return () => controller.abort(); }, []);
+  useEffect(() => {
+    const index = focusAfterLoadRef.current;
+    if (index === null || !series || series.length <= index) return;
+    focusAfterLoadRef.current = null;
+    queueMicrotask(() => focusAndReveal(gridRef.current?.querySelectorAll<HTMLElement>(".card")[index] ?? null));
+  }, [series]);
   const loadMore = async () => {
     if (pending || !hasMore) return;
     setPending(true);
@@ -915,13 +942,18 @@ function SeriesCatalog() {
       const response = await fetch(`/api/series?page=${next}`);
       if (!response.ok) throw new Error("series");
       const payload = await response.json() as { series: Series[]; hasMore: boolean };
-      setSeries((current) => [...(current ?? []), ...payload.series.filter((candidate) => !current?.some((item) => item.id === candidate.id))]);
+      setSeries((current) => {
+        const existing = current ?? [];
+        const additions = payload.series.filter((candidate) => !existing.some((item) => item.id === candidate.id));
+        if (additions.length) focusAfterLoadRef.current = existing.length;
+        return [...existing, ...additions];
+      });
       setPage(next);
       setHasMore(payload.hasMore);
     } catch { setFailed(true); }
     finally { setPending(false); }
   };
-  return <section className="rail-page series-page"><a className="back focusable" href="/">← На главную</a><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid">{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div>{hasMore && series?.length ? <button className="primary focusable load-more" onClick={() => void loadMore()} disabled={pending}>{pending ? "Загружаем…" : "Показать ещё сериалы"}</button> : null}</section>;
+  return <section className="rail-page series-page"><a className="back focusable" href="/">← На главную</a><p className="eyebrow">СЕРИАЛЫ</p><h1>Что посмотреть вечером</h1>{!series && !failed ? <p role="status">Загружаем сериалы…</p> : null}{failed ? <p role="alert">Не удалось загрузить сериалы.</p> : null}{series?.length === 0 ? <p>Seerr пока не вернул сериалы.</p> : null}<div className="movie-grid" ref={gridRef}>{series?.map((item, index) => <SeriesCard series={item} key={item.id} pageAutoFocus={index === 0} />)}</div>{hasMore && series?.length ? <button className="primary focusable load-more" onClick={() => void loadMore()} disabled={pending}>{pending ? "Загружаем…" : "Показать ещё сериалы"}</button> : null}</section>;
 }
 
 export function WatchlistPage({ movies, series = [] }: { movies: Movie[]; series?: Series[] }) {
@@ -1027,6 +1059,14 @@ function RailPage({ rail }: { rail: Catalog["rails"][number] }) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [pending, setPending] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const focusAfterLoadRef = useRef<number | null>(null);
+  useEffect(() => {
+    const index = focusAfterLoadRef.current;
+    if (index === null || movies.length <= index) return;
+    focusAfterLoadRef.current = null;
+    queueMicrotask(() => focusAndReveal(gridRef.current?.querySelectorAll<HTMLElement>(".card")[index] ?? null));
+  }, [movies]);
   const loadMore = async () => {
     if (pending || !hasMore) return;
     setPending(true);
@@ -1035,7 +1075,11 @@ function RailPage({ rail }: { rail: Catalog["rails"][number] }) {
       const response = await fetch(`/api/rails/${encodeURIComponent(rail.id)}?page=${next}`);
       if (!response.ok) throw new Error("rail");
       const payload = await response.json() as { movies: Movie[]; hasMore: boolean };
-      setMovies((current) => [...current, ...payload.movies.filter((movie) => !current.some((item) => item.id === movie.id))]);
+      setMovies((current) => {
+        const additions = payload.movies.filter((movie) => !current.some((item) => item.id === movie.id));
+        if (additions.length) focusAfterLoadRef.current = current.length;
+        return [...current, ...additions];
+      });
       setPage(next);
       setHasMore(payload.hasMore);
     } finally {
@@ -1047,7 +1091,7 @@ function RailPage({ rail }: { rail: Catalog["rails"][number] }) {
       <a className="back focusable" href="/">← На главную</a>
       <p className="eyebrow">КОЛЛЕКЦИЯ</p>
       <h1 id="rail-page-title">{rail.title}</h1>
-      <div className="movie-grid">{movies.map((movie, index) => <MovieCard movie={movie} key={movie.id} pageAutoFocus={index === 0} />)}</div>
+      <div className="movie-grid" ref={gridRef}>{movies.map((movie, index) => <MovieCard movie={movie} key={movie.id} pageAutoFocus={index === 0} />)}</div>
       {hasMore ? <button className="primary focusable load-more" onClick={() => void loadMore()} disabled={pending}>{pending ? "Загружаем…" : "Показать ещё фильмы"}</button> : null}
     </section>
   );

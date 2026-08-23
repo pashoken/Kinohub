@@ -87,6 +87,12 @@ export function buildApp(config: AppConfig) {
     try { return proxySeriesImages(await seerr.seriesDetail(id)); }
     catch { return reply.code(404).send({ code: "SERIES_NOT_FOUND", message: "Сериал не найден" }); }
   });
+  app.get("/api/series/:id/recommendations", async (request) => {
+    const id = (request.params as { id: string }).id;
+    if (!seerr) return { series: [] };
+    try { return { series: (await seerr.seriesRecommendations(id)).map(proxySeriesImages) }; }
+    catch { return { series: [] }; }
+  });
   app.get("/api/rails/:id", async (request, reply) => {
     if (!seerr) return reply.code(404).send({ code: "LIVE_ONLY", message: "Расширенные ленты доступны в live-режиме" });
     const id = (request.params as { id: string }).id;
