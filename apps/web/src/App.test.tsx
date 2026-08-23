@@ -45,7 +45,9 @@ describe("TV season picker", () => {
     const onChange = vi.fn();
     render(<SeasonPicker seasons={seasons} value={1} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: /Сезон 1/ }));
-    expect(screen.getByRole("dialog", { name: "Какой сезон открыть?" })).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Какой сезон открыть?" });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.closest("[data-modal-layer]")).toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /Сезон 1.*8 серий/ })));
     fireEvent.keyDown(screen.getByRole("button", { name: /Сезон 2.*10 серий/ }), { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith(2);
@@ -147,6 +149,7 @@ describe("catalog surfaces", () => {
     const movie = fixtureCatalog.rails[0]!.movies[0]!;
     const view = render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
     fireEvent.click(screen.getByRole("button", { name: "Оценить" }));
+    expect(screen.getByRole("dialog").closest("[data-modal-layer]")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "8" }));
     expect(localStorage.getItem("kinohub-taste-profile-v1")).toContain(`movie:${movie.id}`);
     expect(localStorage.getItem("kinohub-taste-profile-v1")).toContain('"value":8');
@@ -338,6 +341,7 @@ describe("torrent choice drawer", () => {
     expect(
       screen.getByText(/5.0 ГБ.*44 сидов.*112 баллов/),
     ).toBeInTheDocument();
+    expect(screen.getByRole("dialog").closest("[data-modal-layer]")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Movie 2160p/ })).toBeDisabled();
     expect(document.body.textContent).not.toMatch(
       /magnet:|server-link|api[_-]?key/i,
@@ -366,6 +370,13 @@ describe("torrent choice drawer", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Поиск не ответил",
     );
+    vi.unstubAllGlobals();
+  });
+  it("explains that configured trackers may respond slowly", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => undefined)));
+    render(<TorrentChoiceDrawer movieId="movie-waiting" onClose={() => undefined} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Получаем ответы от трекеров · 0 сек.");
+    expect(screen.getByRole("status")).toHaveTextContent("иногда занимает до минуты");
     vi.unstubAllGlobals();
   });
 });
@@ -414,6 +425,7 @@ describe("playback panel", () => {
         onClose={() => undefined}
       />,
     );
+    expect(screen.getByRole("dialog").closest("[data-modal-layer]")).toBeInTheDocument();
     expect(
       screen
         .getAllByRole("button", { name: /Фильм часть/ })

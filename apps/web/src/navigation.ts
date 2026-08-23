@@ -40,7 +40,7 @@ function visible(element: HTMLElement) {
 }
 
 type Direction = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
-const navigationGridSelector = ".rail, .movie-grid, .result-grid, .actions, .episode-picker, .player-ready, .file-list, .rating-grid, .season-grid, .search-field, nav";
+const navigationGridSelector = ".rail, .movie-grid, .result-grid, .actions, .episode-picker, .player-ready, .file-list, .choice-list, .rating-grid, .season-grid, .search-field, nav";
 
 function visualRows(elements: HTMLElement[]): HTMLElement[][] {
   const sorted = [...elements].sort((left, right) => {
@@ -125,7 +125,7 @@ export function useSpatialNavigation() {
           : undefined;
       if (!current) {
         event.preventDefault();
-        candidates[0]?.focus();
+        focusNavigationTarget(candidates[0]!);
         return;
       }
       const navigationGrid = current.closest<HTMLElement>(navigationGridSelector);
