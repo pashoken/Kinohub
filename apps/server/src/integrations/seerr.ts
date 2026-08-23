@@ -74,6 +74,11 @@ export class SeerrClient {
     return normalizeSeerrSeries(await this.call(`/api/v1/tv/${encodeURIComponent(id)}`));
   }
 
+  async seriesRecommendations(id: string, page = 1): Promise<Series[]> {
+    const payload = await this.call<{ results: unknown[] }>(`/api/v1/tv/${encodeURIComponent(id)}/recommendations?page=${page}`);
+    return normalizeSeriesList(payload.results);
+  }
+
   async searchSeries(query: string): Promise<Series[]> {
     const payload = await this.call<{ results: unknown[] }>(`/api/v1/search?query=${encodeURIComponent(query)}&page=1`);
     return normalizeSeriesList(payload.results);

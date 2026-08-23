@@ -130,6 +130,24 @@ describe("catalog surfaces", () => {
     render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Смотреть сейчас" })));
   });
+  it("renders series details like a movie and loads similar series", async () => {
+    const show = { id: "1399", title: "Игра престолов", year: 2011, overview: "Борьба великих домов.", rating: 8.5, genres: ["Драма"], posterUrl: null, backdropUrl: null, mediaStatus: "unknown" as const, numberOfSeasons: 1, episodeRuntimeMinutes: 57, seasons: [{ seasonNumber: 1, name: "Сезон 1", episodeCount: 10, posterUrl: null }] };
+    const similar = { ...show, id: "94997", title: "Дом Дракона" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/recommendations")) return new Response(JSON.stringify({ series: [similar] }));
+      return new Response(JSON.stringify(show));
+    });
+    render(<App initialCatalog={fixtureCatalog} initialPath="/series/1399" />);
+
+    expect(await screen.findByRole("heading", { name: "Игра престолов" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Буду смотреть" })).toHaveClass("watchlist-action");
+    expect(screen.getByRole("button", { name: "Оценить" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Выбрать раздачу 1 сезона/ })).toHaveClass("primary");
+    expect(await screen.findByRole("heading", { name: "Похожее на этот сериал" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Дом Дракона/ })).toBeInTheDocument();
+    fetchMock.mockRestore();
+  });
   it("persists movies in Буду смотреть and renders the separate page", async () => {
     const movie = fixtureCatalog.rails[0]!.movies[0]!;
     render(<App initialCatalog={fixtureCatalog} initialPath={`/movies/${movie.id}`} />);
@@ -186,6 +204,20 @@ describe("catalog surfaces", () => {
     expect(document.querySelectorAll('.rail[aria-hidden="true"]')).toHaveLength(
       0,
     );
+  });
+  it("focuses the first newly loaded movie after showing more", async () => {
+    const initialMovie = fixtureCatalog.rails[0]!.movies[0]!;
+    const newMovie = { ...fixtureCatalog.rails[0]!.movies[1]!, id: "new-page-movie", title: "Первый новый фильм" };
+    const catalog = { generatedAt: fixtureCatalog.generatedAt, rails: [{ id: "popular", title: "Популярное сейчас", movies: [initialMovie] }] };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ movies: [newMovie], hasMore: false }), { status: 200, headers: { "content-type": "application/json" } }));
+    render(<App initialCatalog={catalog} initialPath="/rails/popular" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Показать ещё фильмы" }));
+
+    const firstNewCard = await screen.findByRole("link", { name: /Первый новый фильм/ });
+    await waitFor(() => expect(document.activeElement).toBe(firstNewCard));
+    expect(fetchMock).toHaveBeenCalledWith("/api/rails/popular?page=2");
+    fetchMock.mockRestore();
   });
 });
 
