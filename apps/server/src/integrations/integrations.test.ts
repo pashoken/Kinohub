@@ -251,14 +251,19 @@ describe("TorrServer contract and safe diagnostics", () => {
   });
 
   it("selects mock/unconfigured/live diagnostics explicitly and redacts values", () => {
-    const mock = integrationDiagnostics(parseConfig({ APP_MODE: "mock" }), {});
+    const mock = integrationDiagnostics(parseConfig({ APP_MODE: "mock" }));
     const missing = integrationDiagnostics(
       parseConfig({ APP_MODE: "unconfigured" }),
-      {},
     );
-    const live = integrationDiagnostics(parseConfig({ APP_MODE: "live" }), {
+    const live = integrationDiagnostics(parseConfig({ APP_MODE: "live",
       SEERR_URL: "http://private.test",
-    });
+      SEERR_API_KEY: "test",
+      JACKETT_URL: "http://jackett.test",
+      PUBLIC_JACKETT_URL: "http://jackett.test",
+      JACKETT_API_KEY: "test",
+      TORRSERVER_URL: "http://torrserver.test",
+      PUBLIC_TORRSERVER_URL: "http://torrserver.test",
+    }));
     expect(mock.every((item) => item.status === "mock")).toBe(true);
     expect(missing.every((item) => item.status === "missing")).toBe(true);
     expect(live.find((item) => item.service === "seerr")?.status).toBe("ready");

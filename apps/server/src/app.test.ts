@@ -36,6 +36,22 @@ describe('mock API', () => {
 });
 
 describe('configuration', () => {
+  it('accepts blank optional values from the public env template', () => {
+    const parsed = parseConfig({
+      SEERR_URL: '',
+      SEERR_API_KEY: '',
+      JACKETT_URL: '',
+      JACKETT_API_KEY: '',
+      TORRSERVER_URL: '',
+    });
+    expect(parsed.SEERR_URL).toBeUndefined();
+    expect(parsed.JACKETT_API_KEY).toBeUndefined();
+  });
+
+  it('fails fast when a live deployment is incomplete', () => {
+    expect(() => parseConfig({ APP_MODE: 'live' })).toThrow('SEERR_URL');
+  });
+
   it('names an invalid variable without revealing its value', () => {
     expect(() => parseConfig({ PORT: 'very-secret-invalid-value' })).toThrow(ConfigError);
     try {

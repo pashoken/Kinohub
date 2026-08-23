@@ -5,19 +5,10 @@ services:
     init: true
     environment:
       LOG_LEVEL: info
-      TZ: Europe/Samara
+      TZ: ${TZ:-Etc/UTC}
       PORT: 5055
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    # Local ISP DNS currently sinks TMDB to 127.0.0.1. Refresh these CDN
-    # addresses through Cloudflare DoH if TMDB becomes unreachable.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-      - "api.themoviedb.org:65.9.62.11"
-      - "image.tmdb.org:185.59.220.199"
     ports:
-      - "127.0.0.1:5055:5055"
+      - "127.0.0.1:${SEERR_PORT:-5055}:5055"
     volumes:
       - seerr-data:/app/config
     healthcheck:

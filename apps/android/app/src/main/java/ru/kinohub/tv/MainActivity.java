@@ -134,7 +134,7 @@ public final class MainActivity extends Activity {
 
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle(firstLaunch ? "Адрес KinoHub" : "Изменить адрес KinoHub")
-            .setMessage("Укажите IP или адрес сервера, например http://192.168.0.120:4100/")
+            .setMessage("Укажите IP или адрес сервера, например http://192.168.1.50:4100/")
             .setView(input)
             .setPositiveButton("Сохранить", null)
             .setNegativeButton(firstLaunch ? "Оставить текущий" : "Отмена", null)

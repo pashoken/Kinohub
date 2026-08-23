@@ -19,7 +19,6 @@ const envByService: Record<IntegrationName, string> = {
 
 export function integrationDiagnostics(
   config: AppConfig,
-  env: NodeJS.ProcessEnv,
 ): IntegrationDiagnostic[] {
   return (Object.keys(envByService) as IntegrationName[]).map((service) => {
     if (config.APP_MODE === "mock")
@@ -29,7 +28,7 @@ export function integrationDiagnostics(
         status: "mock",
         remediation: "Используется безопасная тестовая интеграция",
       };
-    const configured = Boolean(env[envByService[service]]);
+    const configured = Boolean(config[envByService[service] as keyof AppConfig]);
     return {
       service,
       mode: config.APP_MODE,

@@ -187,13 +187,13 @@ export function buildApp(config: AppConfig) {
   });
   app.get("/api/health/integrations", async () => ({
     mode: config.APP_MODE,
-    services: integrationDiagnostics(config, process.env).map((item) => {
+    services: integrationDiagnostics(config).map((item) => {
       const variable = `${item.service.toUpperCase()}_URL`;
-      const raw = process.env[variable];
+      const raw = config[variable as keyof AppConfig];
       let endpoint = `mock://${item.service}`;
       if (config.APP_MODE !== "mock") {
         try {
-          endpoint = raw ? new URL(raw).origin : "не указан";
+          endpoint = typeof raw === "string" ? new URL(raw).origin : "не указан";
         } catch {
           endpoint = "некорректный адрес";
         }

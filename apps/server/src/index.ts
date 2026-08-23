@@ -1,6 +1,8 @@
 import { buildApp } from './app.js';
 import { parseConfig } from './config.js';
+import { loadLocalEnv } from './load-env.js';
 
+loadLocalEnv();
 const config = parseConfig(process.env);
 const app = buildApp(config);
 

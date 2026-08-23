@@ -9,18 +9,21 @@ services:
     <<: *common
     build: { context: ., dockerfile: Dockerfile }
     image: kinohub-tv:local
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 4100
-      APP_MODE: unconfigured
-      PUBLIC_APP_ORIGIN: http://127.0.0.1:${KINOHUB_PORT:-4100}
+      APP_MODE: ${APP_MODE:-unconfigured}
+      PUBLIC_APP_ORIGIN: ${PUBLIC_APP_ORIGIN:-http://127.0.0.1:4100}
       SEERR_URL: http://seerr:5055
       RADARR_URL: http://radarr:7878
       JACKETT_URL: http://jackett:9117
       TORRSERVER_URL: http://torrserver:8090
       JELLYFIN_URL: http://jellyfin:8096
-    ports: ["127.0.0.1:${KINOHUB_PORT:-4100}:4100"]
+    ports: ["${LAN_BIND:-127.0.0.1}:${KINOHUB_PORT:-4100}:4100"]
     depends_on:
       seerr: { condition: service_healthy }
       jackett: { condition: service_healthy }
@@ -35,7 +38,7 @@ services:
   seerr:
     <<: *common
     image: ghcr.io/seerr-team/seerr:latest
-    environment: { LOG_LEVEL: info, TZ: "${TZ:-Europe/Samara}" }
+    environment: { LOG_LEVEL: info, TZ: "${TZ:-Etc/UTC}" }
     ports: ["127.0.0.1:${SEERR_PORT:-5055}:5055"]
     volumes: [seerr-config:/app/config]
     depends_on:
@@ -51,7 +54,7 @@ services:
   radarr:
     <<: *common
     image: lscr.io/linuxserver/radarr:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Europe/Samara}" }
+    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
     ports: ["127.0.0.1:${RADARR_PORT:-7878}:7878"]
     volumes: [radarr-config:/config, media:/media, downloads:/downloads]
     depends_on:
@@ -67,7 +70,7 @@ services:
   sonarr:
     <<: *common
     image: lscr.io/linuxserver/sonarr:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Europe/Samara}" }
+    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
     ports: ["127.0.0.1:${SONARR_PORT:-8989}:8989"]
     volumes: [sonarr-config:/config, media:/media, downloads:/downloads]
     depends_on:
@@ -83,7 +86,7 @@ services:
   qbittorrent:
     <<: *common
     image: lscr.io/linuxserver/qbittorrent:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Europe/Samara}", WEBUI_PORT: "8080" }
+    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}", WEBUI_PORT: "8080" }
     ports: ["127.0.0.1:${QBITTORRENT_PORT:-8080}:8080"]
     volumes: [qbittorrent-config:/config, downloads:/downloads]
     healthcheck:
@@ -95,7 +98,7 @@ services:
   jackett:
     <<: *common
     image: lscr.io/linuxserver/jackett:latest
-    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Europe/Samara}" }
+    environment: { PUID: "${PUID:-1000}", PGID: "${PGID:-1000}", TZ: "${TZ:-Etc/UTC}" }
     ports: ["127.0.0.1:${JACKETT_PORT:-9117}:9117"]
     volumes: [jackett-config:/config, downloads:/downloads]
     healthcheck:
@@ -108,7 +111,7 @@ services:
   torrserver:
     <<: *common
     image: ghcr.io/yourok/torrserver:latest
-    environment: { TS_PORT: "8090", TS_PATH: /opt/ts, TS_DONTKILL: "1", TS_HTTPAUTH: "1" }
+    environment: { TS_PORT: "8090", TS_PATH: /opt/ts, TS_DONTKILL: "1", TS_HTTPAUTH: "0" }
     ports: ["127.0.0.1:${TORRSERVER_PORT:-8090}:8090"]
     volumes: [torrserver-data:/opt/ts]
     healthcheck:

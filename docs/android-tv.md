@@ -30,8 +30,8 @@ adb connect PROJECTOR_IP:5555
 adb install -r artifacts/apk/kinohub-tv-0.3.0.apk
 ```
 
-The projector must be able to reach both `192.168.0.120:4100` (KinoHub) and
-`192.168.0.120:8091` (TorrServer).
+The TV/projector must be able to reach the configured KinoHub address and the
+`PUBLIC_TORRSERVER_URL` from `.env`. Use the server's real LAN hostname or static IP.
 
 ## Build
 

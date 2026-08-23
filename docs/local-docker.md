@@ -1,26 +1,41 @@
-# Локальный Docker-запуск KinoHub
+# Docker-запуск KinoHub
 
-## Быстрый mock-стенд
+## Production-коробка с внешними сервисами
 
-Требования: Docker Desktop с Compose v2. Секреты и сторонние аккаунты не нужны.
+Требуется Docker Engine/Desktop с Compose v2 и настроенные Seerr, Jackett и TorrServer.
 
-```powershell
-docker compose config
-docker compose up -d --build
-docker compose ps
-npm run smoke:docker
+```bash
+cp .env.example .env
+# заполните .env
+bash scripts/deploy.sh
 ```
 
-Откройте `http://127.0.0.1:4100`; диагностика — `http://127.0.0.1:4100/setup`. Остановка: `docker compose down`. Порт меняется через `KINOHUB_PORT`, например `$env:KINOHUB_PORT=4110`.
+Deploy-скрипт проверяет шаблон, собирает образ и ждёт healthy-состояния. Остановка: `docker compose down`; обновление: `git pull` и повторный запуск скрипта.
 
-## Полная лаборатория (только по явному запросу)
+## Доступ из локальной сети
 
-```powershell
+Скопируйте `.env.example` в `.env` и измените:
+
+```dotenv
+LAN_BIND=0.0.0.0
+KINOHUB_PORT=4100
+PUBLIC_APP_ORIGIN=http://192.168.1.50:4100
+```
+
+Подставьте постоянный IPv4/hostname машины с Docker и разрешите порт только для доверенной LAN в firewall. Административные панели остальных сервисов по умолчанию остаются на `127.0.0.1`.
+
+## Полный медиастек
+
+`compose.full.yaml` поднимает KinoHub, Seerr, Radarr, Sonarr, qBittorrent, Jackett, TorrServer и Jellyfin:
+
+```bash
 docker compose -f compose.full.yaml config
 docker compose -f compose.full.yaml --profile full up -d
 ```
 
-| Сервис | Порт хоста | Постоянные данные |
+Сначала оставьте `APP_MODE=unconfigured`, настройте аккаунты, каталоги и связи через UI сервисов, затем перенесите URL/API-ключи в `.env`, выполните `npm run config:check` и переключите `APP_MODE=live`. Переменные описаны в [configuration.md](configuration.md).
+
+| Сервис | Порт по умолчанию | Постоянные тома |
 |---|---:|---|
 | KinoHub | 4100 | нет |
 | Seerr | 5055 | `seerr-config` |
@@ -31,22 +46,14 @@ docker compose -f compose.full.yaml --profile full up -d
 | TorrServer | 8090 | `torrserver-data` |
 | Jellyfin | 8096 | `jellyfin-config`, `jellyfin-cache`, `media` |
 
-Все опубликованные порты привязаны к `127.0.0.1`. Сначала задайте пароли в UI qBittorrent/TorrServer, затем индексаторы Jackett, загрузчик и корневые каталоги Radarr/Sonarr, Jellyfin, Seerr и лишь после этого переключайте KinoHub из `unconfigured` в `live`. API-ключи храните только в локальном `.env`, который исключён из образа.
+`docker compose down` сохраняет тома. Не используйте `docker compose down -v`, если не собираетесь безвозвратно удалить конфигурацию и базы. Перед обновлением делайте резервную копию томов.
 
-Перед удалением томов сделайте резервную копию: `docker run --rm -v kinohub-full_seerr-config:/data -v ${PWD}:/backup alpine tar czf /backup/seerr-config.tgz -C /data .`. Повторите для каждого тома из таблицы. `docker compose down` сохраняет данные; `docker compose down -v` необратимо удаляет их и не используется в штатном откате.
+## Только Seerr
 
-## Только Seerr рядом с внешним TorrServer
-
-На Windows используйте именованный Docker-том для SQLite Seerr:
-
-```powershell
+```bash
 docker compose -f compose.seerr.yaml up -d
 ```
 
-Seerr откроется на `http://127.0.0.1:5055` как часть общего проекта `kinohub-local`; его существующие настройки сохраняются во внешнем томе `kinohub-seerr_seerr-data`. Контейнерный TorrServer доступен на `http://127.0.0.1:8091`, а внутри сети compose — как `http://torrserver:8090`. Порт `8091` выбран, чтобы локальный экземпляр TorrServer на Windows мог временно продолжать работать на `8090`. Seerr напрямую с TorrServer не интегрируется: Seerr отвечает за каталог и запросы, а KinoHub вызывает TorrServer отдельно.
+Seerr откроется на `http://127.0.0.1:5055`, а настройки сохранятся в именованном томе. Этот вариант удобен, если остальные сервисы уже работают отдельно.
 
-Для просмотра с телевизора или проектора задайте `LAN_HOST` равным IPv4-адресу компьютера. KinoHub и TorrServer публикуются в локальную сеть, а административные интерфейсы Seerr и Jackett остаются привязаны к `127.0.0.1`.
-
-Для Media Station X откройте Settings → Start Parameter → Setup и введите только `LAN_HOST:KINOHUB_PORT` (например, `192.168.0.120:4100`). MSX автоматически загрузит `/msx/start.json`, покажет плитку KinoHub и откроет приложение через действие `link:`.
-
-Ссылки загрузки Jackett, передаваемые в контейнер TorrServer, должны использовать внутренний адрес `http://jackett:9117`; `localhost:9117` внутри TorrServer указывает не на Jackett.
+Для Media Station X укажите `HOST:PORT` KinoHub (например, `192.168.1.50:4100`) в Settings → Start Parameter → Setup. MSX загрузит `/msx/start.json` автоматически.

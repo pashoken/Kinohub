@@ -13,3 +13,13 @@ local.properties
 apps/android/app/build/
 .android-tooling/
 artifacts/apk/*.apk
+
+# Machine-specific administration helpers and diagnostics
+connect-samba.cmd
+connect-samba.ps1
+repair-samba.cmd
+samba-diagnose.txt
+*.local
+.idea/
+.vscode/
+.DS_Store

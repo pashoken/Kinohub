@@ -12,7 +12,7 @@ android {
         targetSdk 35
         versionCode 3
         versionName "0.3.0"
-        buildConfigField "String", "KINOHUB_URL", '"http://192.168.0.120:4100/"'
+        buildConfigField "String", "KINOHUB_URL", '"http://kinohub.local:4100/"'
     }
 
     buildFeatures {
